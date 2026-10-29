@@ -1,0 +1,56 @@
+{
+  "runId": "2026-10-22_2010_acme_forms_load",
+  "profile": {
+    "type": "load",
+    "users": 10,
+    "rampSec": 120,
+    "holdSec": 600,
+    "rampDownSec": 60,
+    "totalSec": 780,
+    "holdWindow": {
+      "fromSec": 120,
+      "toSec": 720
+    }
+  },
+  "mix": {
+    "analyst_forms_grid": 100
+  },
+  "thinkTime": {
+    "min": 2,
+    "max": 6
+  },
+  "journeys": [
+    {
+      "name": "analyst_forms_grid",
+      "key": "analyst",
+      "role": "Analyst",
+      "exec": "analystFormsGrid",
+      "steps": [
+        {
+          "name": "grid_open",
+          "optionalShare": 100
+        },
+        {
+          "name": "grid_search",
+          "optionalShare": 100
+        },
+        {
+          "name": "grid_sort",
+          "optionalShare": 100
+        },
+        {
+          "name": "grid_filter",
+          "optionalShare": 100
+        },
+        {
+          "name": "grid_next_page",
+          "optionalShare": 100
+        },
+        {
+          "name": "grid_export",
+          "optionalShare": 5
+        }
+      ]
+    }
+  ]
+}

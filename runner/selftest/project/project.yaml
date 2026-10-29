@@ -1,0 +1,19 @@
+# Self-test project: runs against the local mock server (runner/selftest/server.ts).
+# PERF_SELFTEST_URL is the mock's address; the self-test command sets it before loading this file.
+# Unset, it falls back to a placeholder so the config still loads (config tests, `perf check` without a server).
+name: selftest
+roles: [User]            # the env adapter reads PERF_USER_LOGIN / PERF_USER_PASSWORD
+envs:
+  local:
+    app_url: "${PERF_SELFTEST_URL:-http://127.0.0.1:0}"
+    api_url: "${PERF_SELFTEST_URL:-http://127.0.0.1:0}/api"
+    swagger_url: "${PERF_SELFTEST_URL:-http://127.0.0.1:0}/swagger/v1/swagger.json"
+    caps: { max_vus: 20, max_rps: 30, max_duration: 30m }
+    defaults: { vus: 10, rps: 15 }
+auth:
+  type: ropc
+abort:
+  error_rate: 0.10
+  p95_ms: 15000
+  db_cpu_or_io_pct: 95
+read_only_post_routes: [/items/search, /items/slow-search, /items/export]   # the mock's POSTs only read

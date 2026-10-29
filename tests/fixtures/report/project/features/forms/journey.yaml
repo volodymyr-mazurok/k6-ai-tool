@@ -1,0 +1,54 @@
+# Fixture feature for the report tests (tests/fixtures/report/*): the journeys and workload the fixture run folders were
+# recorded from. Only an older run folder without a workload snapshot falls back to reading these files.
+read_only: true
+journeys:
+  - name: analyst_forms_grid
+    key: analyst
+    role: Analyst
+    exec: analystFormsGrid
+    evidence: { source: fixture }
+    steps:
+      - name: grid_open
+        request: POST /analyst/form
+        evidence: { source: fixture }
+      - name: grid_search
+        request: POST /analyst/form
+        evidence: { source: fixture }
+      - name: grid_sort
+        request: POST /analyst/form
+        evidence: { source: fixture }
+      - name: grid_filter
+        request: POST /analyst/form
+        evidence: { source: fixture }
+      - name: grid_next_page
+        request: POST /analyst/form
+        evidence: { source: fixture }
+      - name: grid_export
+        request: POST /analyst/form/download-xls
+        optional_share: 5
+        evidence: { source: fixture }
+  - name: manager_forms_grid
+    key: manager
+    role: Manager
+    exec: managerFormsGrid
+    evidence: { source: fixture }
+    steps:
+      - name: grid_open
+        request: POST /manager/form
+        evidence: { source: fixture }
+      - name: grid_search
+        request: POST /manager/form
+        evidence: { source: fixture }
+      - name: grid_sort
+        request: POST /manager/form
+        evidence: { source: fixture }
+      - name: grid_filter
+        request: POST /manager/form
+        evidence: { source: fixture }
+      - name: grid_next_page
+        request: POST /manager/form
+        evidence: { source: fixture }
+      - name: grid_export
+        request: POST /manager/form/download-xls
+        optional_share: 5
+        evidence: { source: fixture }

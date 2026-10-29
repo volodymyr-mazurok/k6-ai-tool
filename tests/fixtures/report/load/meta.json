@@ -1,0 +1,115 @@
+{
+  "runId": "2026-10-22_2010_acme_forms_load",
+  "project": "acme",
+  "feature": "forms",
+  "profile": {
+    "type": "load",
+    "users": 10,
+    "rampSec": 120,
+    "holdSec": 600,
+    "rampDownSec": 60,
+    "totalSec": 780,
+    "holdWindow": {
+      "fromSec": 120,
+      "toSec": 720
+    }
+  },
+  "env": "staging",
+  "startedAt": "2026-10-22T20:10:00.000Z",
+  "endedAt": "2026-10-22T20:23:05.000Z",
+  "k6Version": "2.3.0",
+  "git": {
+    "commit": "0123456789abcdef0123456789abcdef01234567",
+    "dirty": false
+  },
+  "loadMachine": {
+    "host": "perf-laptop",
+    "platform": "darwin-arm64"
+  },
+  "fingerprint": {
+    "before": {
+      "swaggerSha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "appMain": "main-FIXTURE1.js"
+    },
+    "after": {
+      "swaggerSha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "appMain": "main-FIXTURE1.js"
+    },
+    "changed": false
+  },
+  "guardrails": {
+    "allowMax": false,
+    "windowOverride": false,
+    "busyOverride": false
+  },
+  "k6": {
+    "exitCode": 0,
+    "signal": null,
+    "scriptErrors": 0
+  },
+  "interrupted": false,
+  "checks": [],
+  "cleanup": {
+    "before": {
+      "forms": 1000,
+      "form_applicants": 1010,
+      "form_history": 2000,
+      "client": 5000
+    },
+    "after": {
+      "forms": 1000,
+      "form_applicants": 1010,
+      "form_history": 2000,
+      "client": 5000
+    },
+    "ok": true
+  },
+  "targets": "baseline",
+  "abort": {
+    "errorRate": 0.1,
+    "p95Ms": 45000,
+    "dbCpuOrIoPct": 95,
+    "source": {
+      "errorRate": "project",
+      "p95Ms": "feature",
+      "dbCpuOrIoPct": "project"
+    },
+    "projectDefault": {
+      "errorRate": 0.1,
+      "p95Ms": 15000,
+      "dbCpuOrIoPct": 95
+    }
+  },
+  "baseline": null,
+  "rules": {
+    "flags": {
+      "errorRate": 0.01,
+      "checkFailureRate": 0.005,
+      "p95Factor": 1.2,
+      "p95AddMs": 100,
+      "dbPct": 80
+    },
+    "breaking": {
+      "errorRate": 0.05,
+      "latencyFactor": 3,
+      "dbPct": 90
+    }
+  },
+  "workload": {
+    "businessUnit": "analysts working",
+    "businessAction": "grid actions",
+    "thinkTime": {
+      "min": 2,
+      "max": 6
+    },
+    "readOnly": true,
+    "requests": {
+      "analyst.grid_open": "POST /analyst/form",
+      "analyst.grid_search": "POST /analyst/form",
+      "analyst.grid_sort": "POST /analyst/form",
+      "analyst.grid_filter": "POST /analyst/form",
+      "analyst.grid_next_page": "POST /analyst/form",
+      "analyst.grid_export": "POST /analyst/form/download-xls"
+    }
+  }
+}

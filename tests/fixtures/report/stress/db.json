@@ -1,0 +1,382 @@
+{
+  "tier": "S1",
+  "edition": "SQL Azure",
+  "window": {
+    "from": "2026-10-22T20:40:00.000Z",
+    "to": "2026-10-22T20:52:05.000Z"
+  },
+  "resource": [
+    {
+      "endTime": "2026-10-22T20:40:07.500Z",
+      "t": 5.5,
+      "cpu": 14.54,
+      "dataIo": 20.95,
+      "logWrite": 0.21
+    },
+    {
+      "endTime": "2026-10-22T20:40:22.500Z",
+      "t": 20.5,
+      "cpu": 15.71,
+      "dataIo": 22.8,
+      "logWrite": 0.25
+    },
+    {
+      "endTime": "2026-10-22T20:40:37.500Z",
+      "t": 35.5,
+      "cpu": 15.96,
+      "dataIo": 22.61,
+      "logWrite": 0.28
+    },
+    {
+      "endTime": "2026-10-22T20:40:52.500Z",
+      "t": 50.5,
+      "cpu": 15.16,
+      "dataIo": 20.51,
+      "logWrite": 0.3
+    },
+    {
+      "endTime": "2026-10-22T20:41:07.500Z",
+      "t": 65.5,
+      "cpu": 13.73,
+      "dataIo": 18.04,
+      "logWrite": 0.3
+    },
+    {
+      "endTime": "2026-10-22T20:41:22.500Z",
+      "t": 80.5,
+      "cpu": 12.45,
+      "dataIo": 17,
+      "logWrite": 0.29
+    },
+    {
+      "endTime": "2026-10-22T20:41:37.500Z",
+      "t": 95.5,
+      "cpu": 12,
+      "dataIo": 18.15,
+      "logWrite": 0.27
+    },
+    {
+      "endTime": "2026-10-22T20:41:52.500Z",
+      "t": 110.5,
+      "cpu": 12.62,
+      "dataIo": 20.65,
+      "logWrite": 0.24
+    },
+    {
+      "endTime": "2026-10-22T20:42:07.500Z",
+      "t": 125.5,
+      "cpu": 27.98,
+      "dataIo": 29.67,
+      "logWrite": 0.2
+    },
+    {
+      "endTime": "2026-10-22T20:42:22.500Z",
+      "t": 140.5,
+      "cpu": 29.35,
+      "dataIo": 29.75,
+      "logWrite": 0.16
+    },
+    {
+      "endTime": "2026-10-22T20:42:37.500Z",
+      "t": 155.5,
+      "cpu": 29.99,
+      "dataIo": 27.82,
+      "logWrite": 0.13
+    },
+    {
+      "endTime": "2026-10-22T20:42:52.500Z",
+      "t": 170.5,
+      "cpu": 29.57,
+      "dataIo": 25.29,
+      "logWrite": 0.11
+    },
+    {
+      "endTime": "2026-10-22T20:43:07.500Z",
+      "t": 185.5,
+      "cpu": 28.3,
+      "dataIo": 24.01,
+      "logWrite": 0.1
+    },
+    {
+      "endTime": "2026-10-22T20:43:22.500Z",
+      "t": 200.5,
+      "cpu": 26.87,
+      "dataIo": 24.91,
+      "logWrite": 0.1
+    },
+    {
+      "endTime": "2026-10-22T20:43:37.500Z",
+      "t": 215.5,
+      "cpu": 26.05,
+      "dataIo": 27.33,
+      "logWrite": 0.12
+    },
+    {
+      "endTime": "2026-10-22T20:43:52.500Z",
+      "t": 230.5,
+      "cpu": 26.27,
+      "dataIo": 29.51,
+      "logWrite": 0.15
+    },
+    {
+      "endTime": "2026-10-22T20:44:07.500Z",
+      "t": 245.5,
+      "cpu": 40.43,
+      "dataIo": 36.86,
+      "logWrite": 0.19
+    },
+    {
+      "endTime": "2026-10-22T20:44:22.500Z",
+      "t": 260.5,
+      "cpu": 41.89,
+      "dataIo": 35.13,
+      "logWrite": 0.22
+    },
+    {
+      "endTime": "2026-10-22T20:44:37.500Z",
+      "t": 275.5,
+      "cpu": 42.87,
+      "dataIo": 32.57,
+      "logWrite": 0.26
+    },
+    {
+      "endTime": "2026-10-22T20:44:52.500Z",
+      "t": 290.5,
+      "cpu": 42.85,
+      "dataIo": 31.05,
+      "logWrite": 0.28
+    },
+    {
+      "endTime": "2026-10-22T20:45:07.500Z",
+      "t": 305.5,
+      "cpu": 41.84,
+      "dataIo": 31.69,
+      "logWrite": 0.3
+    },
+    {
+      "endTime": "2026-10-22T20:45:22.500Z",
+      "t": 320.5,
+      "cpu": 40.38,
+      "dataIo": 34.01,
+      "logWrite": 0.3
+    },
+    {
+      "endTime": "2026-10-22T20:45:37.500Z",
+      "t": 335.5,
+      "cpu": 39.25,
+      "dataIo": 36.32,
+      "logWrite": 0.29
+    },
+    {
+      "endTime": "2026-10-22T20:45:52.500Z",
+      "t": 350.5,
+      "cpu": 39.06,
+      "dataIo": 36.94,
+      "logWrite": 0.26
+    },
+    {
+      "endTime": "2026-10-22T20:46:07.500Z",
+      "t": 365.5,
+      "cpu": 53.91,
+      "dataIo": 43.41,
+      "logWrite": 0.23
+    },
+    {
+      "endTime": "2026-10-22T20:46:22.500Z",
+      "t": 380.5,
+      "cpu": 55.35,
+      "dataIo": 40.86,
+      "logWrite": 0.19
+    },
+    {
+      "endTime": "2026-10-22T20:46:37.500Z",
+      "t": 395.5,
+      "cpu": 56.6,
+      "dataIo": 39.13,
+      "logWrite": 0.16
+    },
+    {
+      "endTime": "2026-10-22T20:46:52.500Z",
+      "t": 410.5,
+      "cpu": 56.99,
+      "dataIo": 39.5,
+      "logWrite": 0.13
+    },
+    {
+      "endTime": "2026-10-22T20:47:07.500Z",
+      "t": 425.5,
+      "cpu": 56.31,
+      "dataIo": 41.69,
+      "logWrite": 0.11
+    },
+    {
+      "endTime": "2026-10-22T20:47:22.500Z",
+      "t": 440.5,
+      "cpu": 54.93,
+      "dataIo": 44.11,
+      "logWrite": 0.1
+    },
+    {
+      "endTime": "2026-10-22T20:47:37.500Z",
+      "t": 455.5,
+      "cpu": 53.59,
+      "dataIo": 44.99,
+      "logWrite": 0.11
+    },
+    {
+      "endTime": "2026-10-22T20:47:52.500Z",
+      "t": 470.5,
+      "cpu": 53,
+      "dataIo": 43.69,
+      "logWrite": 0.13
+    },
+    {
+      "endTime": "2026-10-22T20:48:07.500Z",
+      "t": 485.5,
+      "cpu": 68.49,
+      "dataIo": 49.16,
+      "logWrite": 0.16
+    },
+    {
+      "endTime": "2026-10-22T20:48:22.500Z",
+      "t": 500.5,
+      "cpu": 69.78,
+      "dataIo": 47.24,
+      "logWrite": 0.19
+    },
+    {
+      "endTime": "2026-10-22T20:48:37.500Z",
+      "t": 515.5,
+      "cpu": 71.2,
+      "dataIo": 47.34,
+      "logWrite": 0.23
+    },
+    {
+      "endTime": "2026-10-22T20:48:52.500Z",
+      "t": 530.5,
+      "cpu": 71.97,
+      "dataIo": 49.37,
+      "logWrite": 0.26
+    },
+    {
+      "endTime": "2026-10-22T20:49:07.500Z",
+      "t": 545.5,
+      "cpu": 71.68,
+      "dataIo": 51.87,
+      "logWrite": 0.29
+    },
+    {
+      "endTime": "2026-10-22T20:49:22.500Z",
+      "t": 560.5,
+      "cpu": 70.49,
+      "dataIo": 53,
+      "logWrite": 0.3
+    },
+    {
+      "endTime": "2026-10-22T20:49:37.500Z",
+      "t": 575.5,
+      "cpu": 69.04,
+      "dataIo": 51.94,
+      "logWrite": 0.3
+    },
+    {
+      "endTime": "2026-10-22T20:49:52.500Z",
+      "t": 590.5,
+      "cpu": 68.1,
+      "dataIo": 49.47,
+      "logWrite": 0.28
+    },
+    {
+      "endTime": "2026-10-22T20:50:07.500Z",
+      "t": 605.5,
+      "cpu": 84.18,
+      "dataIo": 60.38,
+      "logWrite": 0.25
+    },
+    {
+      "endTime": "2026-10-22T20:50:22.500Z",
+      "t": 620.5,
+      "cpu": 85.24,
+      "dataIo": 60.2,
+      "logWrite": 0.22
+    },
+    {
+      "endTime": "2026-10-22T20:50:37.500Z",
+      "t": 635.5,
+      "cpu": 86.7,
+      "dataIo": 62.07,
+      "logWrite": 0.18
+    },
+    {
+      "endTime": "2026-10-22T20:50:52.500Z",
+      "t": 650.5,
+      "cpu": 87.79,
+      "dataIo": 64.61,
+      "logWrite": 0.15
+    },
+    {
+      "endTime": "2026-10-22T20:51:07.500Z",
+      "t": 665.5,
+      "cpu": 87.92,
+      "dataIo": 65.98,
+      "logWrite": 0.12
+    },
+    {
+      "endTime": "2026-10-22T20:51:22.500Z",
+      "t": 680.5,
+      "cpu": 87.02,
+      "dataIo": 65.18,
+      "logWrite": 0.1
+    },
+    {
+      "endTime": "2026-10-22T20:51:37.500Z",
+      "t": 695.5,
+      "cpu": 85.57,
+      "dataIo": 62.79,
+      "logWrite": 0.1
+    },
+    {
+      "endTime": "2026-10-22T20:51:52.500Z",
+      "t": 710.5,
+      "cpu": 84.35,
+      "dataIo": 60.55,
+      "logWrite": 0.11
+    }
+  ],
+  "topStatements": [
+    {
+      "key": "0x06000500a1b2c3d400000000000000000000000000000000000000000000000000000000:0:312",
+      "text": "SELECT TOP (@p0) f.Id, f.Status, f.CreatedOn FROM dbo.forms f WHERE f.OwnerId = @p1 ORDER BY f.CreatedOn DESC",
+      "executions": 1210,
+      "elapsedUs": 3894000,
+      "cpuUs": 2940000,
+      "logicalReads": 198400,
+      "avgElapsedMs": 3.218
+    },
+    {
+      "key": "0x06000500a1b2c3d400000000000000000000000000000000000000000000000000000000:314:690",
+      "text": "SELECT COUNT(*) FROM dbo.forms f WHERE f.OwnerId = @p0 AND f.Status = @p1",
+      "executions": 1205,
+      "elapsedUs": 1204000,
+      "cpuUs": 910000,
+      "logicalReads": 61300,
+      "avgElapsedMs": 0.999
+    }
+  ],
+  "evicted": 0,
+  "missingIndexes": [
+    {
+      "table": "dbo.forms",
+      "equality": [
+        "owner_id"
+      ],
+      "inequality": [],
+      "included": [
+        "status"
+      ],
+      "avgUserImpact": 62.4,
+      "userSeeks": 1840
+    }
+  ],
+  "caveat": "Shared database: other activity during the window is included."
+}

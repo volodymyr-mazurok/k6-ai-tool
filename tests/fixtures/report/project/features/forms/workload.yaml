@@ -1,0 +1,9 @@
+business_unit: analysts working
+business_action: grid actions
+mix: { analyst_forms_grid: 70, manager_forms_grid: 30 }
+think_time: { min: 2s, max: 6s }
+profiles:
+  load: { users: 10, ramp: 2m, hold: 10m, ramp_down: 1m }
+  stress: { start_rps: 1, max_rps: 15, step_rps: 2, step_every: 2m }
+targets: baseline
+abort: { p95_ms: 45000 }

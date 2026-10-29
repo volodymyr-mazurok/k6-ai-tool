@@ -1,0 +1,28 @@
+# Who the virtual users are and how hard they work. The report quotes business_unit and business_action in its
+# "Under what load" sentence, e.g. "10 analysts working (pausing 2-6 s between actions) ~ 140 list actions/min".
+business_unit: analysts working   # plural noun first: one virtual user = one of these
+business_action: list actions     # what one request stands for
+
+# Share of iterations per journey, in percent; must add up to 100. Keys are journey names from journey.yaml.
+mix: { analyst_example_list: 100 }
+
+# A virtual user pauses a random time in this range between steps (humans do not click every millisecond).
+think_time: { min: 2s, max: 6s }
+
+# Sizes of the runs. Durations: 90s, 2m, 1h. `users` may not exceed the env's caps.max_vus.
+profiles:
+  load: { users: 10, ramp: 2m, hold: 10m, ramp_down: 1m }
+  stress: { start_rps: 1, max_rps: 15, step_rps: 2, step_every: 2m }
+  # soak: { users: 5, ramp: 2m, hold: 2h, ramp_down: 1m }
+
+# `baseline`: judge a run against the accepted baseline (`perf baseline accept`). Or name step targets:
+# targets:
+#   analyst.list_open: { p95_ms: 1500 }
+targets: baseline
+
+# (optional) Standing data the feature is measured against, as a free mapping. The runner does not read the keys: `perf setup`
+# hands this mapping (with any `--set key=value` laid over it) to the project's adapter, which decides what they mean.
+# standing_data: { rows: 1000 }
+
+# (optional) Limits for this feature. error_rate and db_cpu_or_io_pct may only be tightened; p95_ms may be raised.
+# abort: { p95_ms: 30000 }

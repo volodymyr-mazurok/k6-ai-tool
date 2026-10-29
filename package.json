@@ -1,0 +1,26 @@
+{
+  "name": "performance-framework",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Reusable k6 performance-testing framework: runner, guardrails, reports, mock server",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "test": "tsx --test \"core/**/*.test.js\" \"runner/**/*.test.ts\" \"tests/**/*.test.ts\" \"projects/**/*.test.ts\"",
+    "typecheck": "tsc --noEmit",
+    "perf": "tsx runner/cli.ts",
+    "mock": "tsx runner/selftest/serve.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.5",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2"
+  },
+  "dependencies": {
+    "knex": "^3.3.0",
+    "tedious": "^20.3.8",
+    "yaml": "^2.9.1"
+  }
+}

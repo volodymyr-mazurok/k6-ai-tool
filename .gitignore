@@ -1,0 +1,7 @@
+node_modules/
+results/
+.env
+*.har
+.tmp/
+!tests/fixtures/mini.har
+runner/selftest/project/features/*/baseline.json

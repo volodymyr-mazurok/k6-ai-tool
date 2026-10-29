@@ -1,0 +1,68 @@
+# Template project: copy this folder to projects/<your-project>/ and change the values marked CHANGE.
+#   cp -R projects/_template projects/<name>      then set `name:` below to <name> and rename nothing else.
+# Every key the runner reads is here, with a safe example value. A key marked (optional) can be deleted.
+# Nothing in this file is a secret: logins, passwords and tokens never go in project.yaml (see `roles` and the adapter).
+# `${NAME:-default}` anywhere in this file except under `auth:` is replaced by the environment variable NAME (or the
+# default) when it loads. `auth:` is read as written: a key in a header comes only from `${env:PERF_NAME}` (see auth).
+
+# CHANGE: must equal the folder name; letters, digits, `_` and `-`. `selftest` is taken: it is the self-test project.
+name: _template
+
+# The accounts the journeys log in as, named by role. The default (env) adapter reads one login and password per role
+# from PERF_<ROLE>_LOGIN / PERF_<ROLE>_PASSWORD (role upper-cased; see .env.example). A journey's `role:` is one of these.
+roles: [Analyst]
+
+# One entry per environment you may test. The key is the name you pass as `--env`.
+envs:
+  staging:
+    # CHANGE: the app and the API the journeys call. `.test` never resolves, so this template cannot hit a real host.
+    app_url: https://app.staging.example.test
+    api_url: https://api.staging.example.test/api
+    # Required: every run checks the journey routes against it (`perf check` does the same without running anything).
+    # The API's OpenAPI document, JSON or YAML.
+    swagger_url: https://api.staging.example.test/swagger/v1/swagger.json
+    # Hard ceiling. No flag, no config and no code path may exceed it. Set it from what the environment can take.
+    caps: { max_vus: 20, max_rps: 30, max_duration: 30m }
+    # What a run uses unless it passes --allow-max (then up to caps). Must not exceed caps.
+    defaults: { vus: 10, rps: 15 }
+    # (optional) When load, stress and soak runs are allowed, in UTC. A window may wrap past midnight.
+    # Smoke runs are allowed at any time. weekends: all-day | none. Leave it out for "any time".
+    window_utc: { weekdays: "17:00-06:00", weekends: all-day }
+
+# How the journeys sign in. Two types are built in:
+#   ropc           the OAuth password grant: a token endpoint, a client id, a scope, and a login and password per role
+#                  (the default adapter reads them from .env). The script calls fetchTokens() in setup() (core/auth/ropc.js).
+#   static_header  the same header on every request, no login and no token request; `roles` are then labels only,
+#                  and adapter.ts (if any) needs no resolveEnv.
+#                  `value` may hold ${random:N} (N random letters and digits, made once per virtual user inside k6) and
+#                  ${env:PERF_NAME} (read from .env or the environment by the runner; the name must start with PERF_, so
+#                  it never sits in k6's own environment; it reaches k6 only through the temporary secrets file, and the
+#                  run folder is scanned for it). The script adds it with staticHeaders() (core/auth/static.js):
+#                    auth: { type: static_header, header: Authorization, value: "token ${random:16}" }
+#                    auth: { type: static_header, header: X-Api-Key, value: "${env:PERF_API_KEY}" }
+# Other OAuth flows and signed requests are not built in.
+auth:
+  type: ropc
+
+# A run is stopped when it passes one of these. A feature's workload.yaml may tighten error_rate and db_cpu_or_io_pct
+# (never loosen them) and may raise p95_ms.
+abort:
+  error_rate: 0.10      # share of failed requests, 0..1 (cumulative from the start)
+  p95_ms: 15000         # p95 of all requests, milliseconds
+  db_cpu_or_io_pct: 95  # database CPU or data IO, percent. Required when the adapter has db() (a run is refused without it);
+                        # leave it out for a project without a database (the default adapter has none): nothing would enforce it
+
+# (optional) POST routes (relative to the API base) that only read, e.g. a search endpoint. A read-only feature may call
+# no write (PUT/PATCH/DELETE) and no POST that is not listed here.
+read_only_post_routes:
+  - /items/search
+  - /items/export
+
+# (optional) Tables whose row counts are compared before and after every run; a difference is a FAIL. Needs a
+# rowCounts() in the adapter: whatever the project counts with (a database, an API); the runner does not care how.
+# Lower-case letters, digits and underscores.
+# row_count_tables: [items]
+
+# (optional) Free-form options handed to this project's adapter.ts untouched. The default adapter ignores them.
+# adapter_options:
+#   some_path: ~/work/some-repo

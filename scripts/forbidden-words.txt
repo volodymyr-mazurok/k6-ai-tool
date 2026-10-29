@@ -1,0 +1,8 @@
+# Words that must not appear in the shared, project-agnostic files (core/, runner/, tests/, scripts/, README.md,
+# CLAUDE.md, projects/_template/, ...). One extended regular expression per line, matched case-insensitively; lines
+# starting with # and blank lines are ignored.
+#
+# This shared list stays empty on purpose: it must not name any particular project. A project keeps its own words in
+# projects/<name>/forbidden-words.txt, which travels with the project. scripts/check-shared.sh and tests/readme.test.ts
+# read this file plus every projects/*/forbidden-words.txt that is present, so the check only knows the words of the
+# projects that are in the checkout. Files under projects/<name>/ (other than the template) and docs/ are not checked.

@@ -1,0 +1,19 @@
+# The project the report fixtures were recorded from (see fixtureProject.ts). Never run; it only has to load.
+name: acme
+roles: [Analyst, Manager]
+envs:
+  staging:
+    app_url: https://app.staging.example.test
+    api_url: https://api.staging.example.test/api
+    caps: { max_vus: 20, max_rps: 30, max_duration: 30m }
+    defaults: { vus: 10, rps: 15 }
+auth:
+  type: ropc
+abort:
+  error_rate: 0.10
+  p95_ms: 15000
+  db_cpu_or_io_pct: 95
+# Free-form options for the project's own adapter, passed to it untouched (config.test.ts checks this).
+adapter_options:
+  greeting: passed to the adapter untouched
+  nested: { depth: 2, list: [a, b] }

@@ -1,0 +1,74 @@
+{
+  "runId": "2026-10-22_2040_acme_forms_stress",
+  "profile": {
+    "type": "stress",
+    "stages": [
+      {
+        "fromSec": 0,
+        "rps": 1
+      },
+      {
+        "fromSec": 120,
+        "rps": 3
+      },
+      {
+        "fromSec": 240,
+        "rps": 5
+      },
+      {
+        "fromSec": 360,
+        "rps": 7
+      },
+      {
+        "fromSec": 480,
+        "rps": 9
+      },
+      {
+        "fromSec": 600,
+        "rps": 11
+      }
+    ],
+    "totalSec": 720
+  },
+  "mix": {
+    "analyst_forms_grid": 100
+  },
+  "thinkTime": {
+    "min": 2,
+    "max": 6
+  },
+  "journeys": [
+    {
+      "name": "analyst_forms_grid",
+      "key": "analyst",
+      "role": "Analyst",
+      "exec": "analystFormsGrid",
+      "steps": [
+        {
+          "name": "grid_open",
+          "optionalShare": 100
+        },
+        {
+          "name": "grid_search",
+          "optionalShare": 100
+        },
+        {
+          "name": "grid_sort",
+          "optionalShare": 100
+        },
+        {
+          "name": "grid_filter",
+          "optionalShare": 100
+        },
+        {
+          "name": "grid_next_page",
+          "optionalShare": 100
+        },
+        {
+          "name": "grid_export",
+          "optionalShare": 5
+        }
+      ]
+    }
+  ]
+}

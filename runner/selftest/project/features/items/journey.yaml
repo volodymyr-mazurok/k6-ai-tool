@@ -1,0 +1,20 @@
+# The mock's items API. Its endpoints are POSTs, but they only read (the mock stores nothing), so the feature is read-only
+# and project.yaml lists the three routes in read_only_post_routes. The read-only rules are proven by unit tests.
+read_only: true
+journeys:
+  - name: items_grid
+    key: items
+    role: User
+    exec: itemsGrid
+    evidence: { source: runner/selftest/server.ts }
+    steps:
+      - name: search
+        request: POST /items/search
+        evidence: { source: runner/selftest/server.ts }
+      - name: slow_search
+        request: POST /items/slow-search
+        evidence: { source: runner/selftest/server.ts }
+      - name: export
+        request: POST /items/export
+        optional_share: 5
+        evidence: { source: runner/selftest/server.ts }

@@ -1,0 +1,31 @@
+# What the feature really sends, step by step. Write it from evidence (a recorded browser session, the swagger, the app's
+# own code), not from guesses: `perf check` refuses a step without evidence or whose route is not in the swagger.
+#
+# read_only: true (the default) means the feature may not write; the guardrails are the strictest. Say `false` only for
+# a feature that creates or changes data, and then list every write under `writes:` with who removes what it creates;
+# a writing feature without `writes:` does not load. The only cleanup mode today is `cleanup: app`: the app removes these
+# rows itself (it prunes the table), and the report says "nothing for the runner to clean up". The runner does not delete
+# data for you, so a feature whose rows nobody removes cannot be run; make it read-only instead. `perf check` refuses any
+# write step that is not listed:
+#   read_only: false
+#   writes:
+#     - { request: POST /items, cleanup: app }
+read_only: true
+journeys:
+  # One journey = one kind of user doing one sequence. The id of a step is <key>.<step name>, e.g. analyst.list_open.
+  - name: analyst_example_list      # letters, digits and `_`; used in workload.yaml `mix`
+    key: analyst                    # short id used in step ids and metric names
+    role: Analyst                   # one of project.yaml `roles`
+    exec: analystExampleList        # the exported function in example.js; defaults to the camelCased name
+    evidence: { source: "CHANGE: where this journey comes from" }
+    steps:
+      - name: list_open
+        request: POST /items/search           # "METHOD /route", relative to the env's api_url
+        evidence: { source: "CHANGE: HAR entry, swagger operation or page of the app" }
+      - name: list_search
+        request: POST /items/search
+        evidence: { source: "CHANGE" }
+      - name: export
+        request: POST /items/export
+        optional_share: 5                     # percent of iterations that run this step, 1..100 (default 100)
+        evidence: { source: "CHANGE" }

@@ -1,0 +1,8 @@
+business_unit: users working
+business_action: item actions
+mix: { items_grid: 100 }
+think_time: { min: 0.5s, max: 1s }
+profiles:
+  load: { users: 4, ramp: 15s, hold: 60s, ramp_down: 10s }
+  stress: { start_rps: 2, max_rps: 30, step_rps: 2, step_every: 15s }
+targets: baseline
