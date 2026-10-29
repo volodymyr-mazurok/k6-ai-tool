@@ -1,0 +1,15 @@
+# Two visitors browsing QuickPizza. Sized for a shared public demo site: about one request per second in all.
+business_unit: visitors browsing
+business_action: pizza actions
+
+mix: { pizza_shopper: 100 }
+
+# A visitor reads a little before the next click.
+think_time: { min: 1s, max: 3s }
+
+# Smoke (each step once) and load only. No stress and no soak: Grafana calls the hosted app a resilient shared demo target,
+# and a breaking point needs an environment of your own (the self-test mock shows one, see README.md).
+profiles:
+  load: { users: 2, ramp: 30s, hold: 2m, ramp_down: 30s }
+
+targets: baseline

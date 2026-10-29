@@ -1,0 +1,33 @@
+# QuickPizza: Grafana's public demo app for k6 (source: https://github.com/grafana/quickpizza), hosted by Grafana at
+# https://quickpizza.grafana.com. It is a shared public site, so this project is small on purpose: tiny caps, smoke and load
+# only (no stress, no soak), and a run of at most 5 minutes. It needs no secret, no account and no database: run it as is.
+# How this file maps to projects/_template/project.yaml: see README.md in this folder.
+name: quickpizza
+
+# A label for the journeys only. static_header auth (below) has no accounts, so nothing is read per role.
+roles: [Visitor]
+
+envs:
+  hosted:
+    app_url: https://quickpizza.grafana.com
+    # The journeys call /api/... on the site itself, so the API base is the site's root.
+    api_url: https://quickpizza.grafana.com
+    # The OpenAPI document in the QuickPizza repo, pinned to commit fa8f2e38 (YAML; `perf check` reads it). The hosted
+    # site may run a newer build than this document describes: `perf check` proves the routes against the pinned version.
+    swagger_url: https://raw.githubusercontent.com/grafana/quickpizza/fa8f2e382fcc7d0caee4a2abac8200b9f71778d7/quickpizza-openapi.yaml
+    # Politeness to a shared public site: never above 5 users or 5 requests/s, never longer than 5 minutes.
+    caps: { max_vus: 5, max_rps: 5, max_duration: 5m }
+    defaults: { vus: 2, rps: 2 }
+    # No window_utc: a public demo site has no colleagues' working hours to protect. Keep runs small at any hour.
+
+# QuickPizza wants `Authorization: token <16 characters>`; any 16 characters work (an unknown token falls back to the site's
+# shared default user), so each virtual user makes its own random one. Nothing to keep secret.
+auth:
+  type: static_header
+  header: Authorization
+  value: "token ${random:16}"
+
+# No db_cpu_or_io_pct: this project has no database access (a project with a database must set it).
+abort:
+  error_rate: 0.10      # stop when more than 10% of the requests fail
+  p95_ms: 5000          # the site may be slow from far away: abort only on a real problem, not on normal variance

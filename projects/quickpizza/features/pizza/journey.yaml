@@ -1,0 +1,32 @@
+# One visitor of QuickPizza: reads a quote, looks at the catalog (doughs and tools), and asks for a pizza recommendation.
+# Evidence is the QuickPizza OpenAPI document and code at the pinned commit fa8f2e38 (no recorded session: the API is
+# public and documented). See context.md.
+#
+# Not read-only: POST /api/pizza stores the recommended pizza (catalog.go RecordRecommendation). The app keeps that table
+# to its newest rows itself (enforceTableSizeLimits), so there is nothing for the runner to clean up: `cleanup: app`.
+# `perf check` refuses any other write step, because writes: declares the feature's writes.
+read_only: false
+writes:
+  - request: POST /api/pizza
+    cleanup: app
+journeys:
+  - name: pizza_shopper
+    key: pizza
+    role: Visitor
+    exec: pizzaShopper
+    evidence: { openapi: "https://github.com/grafana/quickpizza/blob/fa8f2e382fcc7d0caee4a2abac8200b9f71778d7/quickpizza-openapi.yaml" }
+    steps:
+      - name: quotes
+        request: GET /api/quotes            # public: no token
+        evidence: { openapi: "https://github.com/grafana/quickpizza/blob/fa8f2e382fcc7d0caee4a2abac8200b9f71778d7/quickpizza-openapi.yaml#L641" }
+      - name: catalog_doughs
+        request: GET /api/doughs
+        evidence: { openapi: "https://github.com/grafana/quickpizza/blob/fa8f2e382fcc7d0caee4a2abac8200b9f71778d7/quickpizza-openapi.yaml#L172" }
+      - name: catalog_tools
+        request: GET /api/tools
+        evidence: { openapi: "https://github.com/grafana/quickpizza/blob/fa8f2e382fcc7d0caee4a2abac8200b9f71778d7/quickpizza-openapi.yaml#L209" }
+      - name: recommend
+        request: POST /api/pizza
+        evidence:
+          openapi: "https://github.com/grafana/quickpizza/blob/fa8f2e382fcc7d0caee4a2abac8200b9f71778d7/quickpizza-openapi.yaml#L32"
+          code: "https://github.com/grafana/quickpizza/blob/fa8f2e382fcc7d0caee4a2abac8200b9f71778d7/pkg/http/http.go#L1352"
