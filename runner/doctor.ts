@@ -22,6 +22,7 @@ import { REPO_ROOT, loadProject, type EnvConfig, type Project } from './config.j
 import { checkEnv } from './guardrails.js';
 import { k6Version } from './k6.js';
 import { JWT, MIN_SECRET_CHARS } from './secretScan.js';
+import { requestToken } from './token.js';
 
 export interface DoctorCheck {
   ok: boolean;
@@ -104,26 +105,10 @@ async function swaggerStatus(url: string): Promise<number> {
   return res.status;
 }
 
-/** The request the k6 side makes (core/auth/ropc.js fetchTokens): the password grant. Only the status leaves this function. */
+/** One password-grant request (runner/token.ts). Only the status and whether a token came back leave this function: the token is dropped. */
 async function tokenAnswer(auth: ResolvedEnv['auth'], account: { login: string; password: string }): Promise<TokenAnswer> {
-  const res = await fetch(auth.tokenUrl, {
-    method: 'POST',
-    headers: { 'content-type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({
-      grant_type: 'password',
-      client_id: auth.clientId,
-      scope: auth.scope,
-      username: account.login,
-      password: account.password,
-    }),
-    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
-  });
-  if (res.status !== 200) {
-    await res.body?.cancel();
-    return { status: res.status, hasAccessToken: false };
-  }
-  const body = (await res.json().catch(() => null)) as { access_token?: unknown } | null;
-  return { status: 200, hasAccessToken: typeof body?.access_token === 'string' };
+  const { status, accessToken } = await requestToken(auth, account);
+  return { status, hasAccessToken: accessToken !== undefined };
 }
 
 /** `db.raw` answers with the rows (the mssql dialect); a `{ recordset }` shape is read too. */

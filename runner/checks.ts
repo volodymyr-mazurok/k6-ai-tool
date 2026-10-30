@@ -109,6 +109,11 @@ function segmentsMatch(template: string[], actual: string[]): boolean {
   return template.length === actual.length && template.every((segment, i) => segmentMatches(segment, actual[i]!));
 }
 
+/** Does the request path `actual` (query ignored) fit the journey route `template`, whose `{param}` parts match any text? Case is ignored. */
+export function routeMatches(template: string, actual: string): boolean {
+  return segmentsMatch(splitPath(template), splitPath(actual));
+}
+
 /** The segments of the api url's path (`https://host/api/` -> `['api']`). */
 function apiBase(apiUrl: string): string[] {
   try {

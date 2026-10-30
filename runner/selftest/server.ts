@@ -45,6 +45,8 @@ const SEARCH_BODY = JSON.stringify({
   totalCount: 500,
 });
 
+const COUNT_BODY = JSON.stringify({ totalCount: 500, pageSize: 20, name: 'Items' });
+
 const EXPORT_BODY = Buffer.alloc(EXPORT_BYTES, 'perf-export;');
 
 // Keys carry the /api prefix, like the real API's swagger.
@@ -147,6 +149,9 @@ export async function startMockServer(opts: MockServerOptions = {}): Promise<Moc
   }
 
   const apiRoutes: Record<string, (res: ServerResponse) => Promise<void>> = {
+    'GET /api/items/count': async (res) => {
+      sendJson(res, 200, COUNT_BODY);
+    },
     'POST /api/items/search': async (res) => {
       await sleep(SEARCH_LATENCY_MS);
       sendJson(res, 200, SEARCH_BODY);

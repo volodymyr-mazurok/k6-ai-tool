@@ -48,6 +48,7 @@ npm test                                   # unit tests; must end with "# fail 0
 npx tsc --noEmit                           # type check; must be clean
 npm run perf -- doctor [<project> --env <env>]
 npm run perf -- check <project> <feature> --env <env>               # "0 problems"
+npm run perf -- probe <project> GET <path> --env <env>             # one request: status, timing, shape; never a token
 npm run perf -- run <project> <feature> --profile smoke --env <env>
 npm run perf -- run <project> <feature> --profile load --env <env> --dry-run
 npm run perf -- selftest                   # known-answer test against the local mock, about 10 minutes

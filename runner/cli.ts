@@ -1,8 +1,8 @@
 // perf <command>: the runner's command line (`npm run perf -- <command> …`).
 // Exit codes: 0 done, 1 the run failed (or `check` found problems, `doctor` a failing check, or a `selftest` check
-// failed), 2 refused (guardrail, config, journey check, a baseline that cannot be accepted) or misused, 130 interrupted.
+// failed), 2 refused (guardrail, config, journey check, a probe request that is not allowed, a baseline that cannot be accepted) or misused, 130 interrupted.
 
-import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { parseArgs } from 'node:util';
@@ -15,6 +15,7 @@ import { formatDryRun, planRun } from './dryRun.js';
 import { acquireEnvLock, checkEnv, GuardrailError, type ProfileType } from './guardrails.js';
 import { summarizeHar } from './har.js';
 import { referenceIds } from './knowledge.js';
+import { formatProbe, probe, ProbeRefusedError } from './probe.js';
 import { NotARunFolderError, renderRunReport, verifyRunReport } from './report/build.js';
 import { runFeature, RunInterruptedError } from './run.js';
 import type { Verdict } from './report/model.js';
@@ -47,6 +48,13 @@ Commands:
       (a value that looks like a number becomes a number). Which keys exist is the project's business; the adapter says what it needs.
   teardown <project> --env <env>
       Remove the standing test data the setup created (only rows the project's own naming marks as its own).
+  probe <project> <METHOD> <path> --env <env> [--feature <feature>] [--body <file.json>] [--role <role>]
+      Send ONE authenticated request to the env's API and print what came back: status, time, content type, size and the shape
+      of a JSON answer (keys, types, array lengths; a number's value only under a count-like key; never a string). Never prints
+      a token, a password or a header. <path> may leave out the API base's own path. Sends a GET; a POST only to a route in the
+      project's read_only_post_routes; any other request only when --feature declares it in writes: (else exit code 2,
+      PROBE_REFUSED, nothing sent). --role picks the account (default: the project's first role). 30 s timeout. Exits 0 when the
+      API answered, whatever its status; 1 when it did not (or the token request failed).
   report <runDir> [--verify-sources | --verify-findings]
       Write report.html and report.md for a run folder (a run writes them itself at its end; use this to redo them after a
       change to findings.md or to the report code). --verify-sources then checks every number on the page against the folder's
@@ -141,6 +149,37 @@ async function doctorCommand(args: string[]): Promise<number> {
   if (!project) console.log('perf: to check access to an env too: npm run perf -- doctor <project> --env <env>');
   if (failed > 0) console.log(`perf: ${failed} of ${checks.length} checks failed`);
   return failed === 0 ? 0 : 1;
+}
+
+async function probeCommand(args: string[]): Promise<number> {
+  const { values, positionals } = parseArgs({
+    args,
+    allowPositionals: true,
+    options: { env: { type: 'string' }, feature: { type: 'string' }, body: { type: 'string' }, role: { type: 'string' } },
+  });
+  const [projectName, method, path, ...extra] = positionals;
+  if (!projectName || !method || !path || extra.length > 0) throw new UsageError('probe needs <project> <METHOD> <path>');
+  if (!values.env) throw new UsageError('probe needs --env <env>');
+
+  let body: unknown;
+  if (values.body !== undefined) {
+    let text: string;
+    try {
+      text = readFileSync(values.body, 'utf8');
+    } catch {
+      throw new UsageError(`--body ${values.body}: cannot read the file`);
+    }
+    try {
+      body = JSON.parse(text);
+    } catch {
+      throw new UsageError(`--body ${values.body}: not valid JSON`); // the parser's own message quotes the text
+    }
+  }
+  const project = await loadProject(projectName);
+  const feature = values.feature ? await loadFeature(project, values.feature) : undefined;
+  const result = await probe({ project, feature, env: values.env, method, path, body, role: values.role });
+  for (const line of formatProbe(method, path, result)) console.log(line);
+  return 0;
 }
 
 async function checkCommand(args: string[]): Promise<number> {
@@ -315,6 +354,7 @@ export async function main(argv: string[]): Promise<number> {
     if (command === 'doctor') return await doctorCommand(rest);
     if (command === 'run') return await runCommand(rest);
     if (command === 'check') return await checkCommand(rest);
+    if (command === 'probe') return await probeCommand(rest);
     if (command === 'setup') return await setupCommand(rest);
     if (command === 'teardown') return await teardownCommand(rest);
     if (command === 'report') return await reportCommand(rest);
@@ -326,6 +366,10 @@ export async function main(argv: string[]): Promise<number> {
   } catch (err) {
     if (err instanceof UsageError || (err as NodeJS.ErrnoException).code?.startsWith('ERR_PARSE_ARGS')) {
       console.error(`perf: ${(err as Error).message}\n\n${USAGE}`);
+      return 2;
+    }
+    if (err instanceof ProbeRefusedError) {
+      console.error(`perf: refused (${err.code}): ${err.message}`);
       return 2;
     }
     if (err instanceof GuardrailError) {
