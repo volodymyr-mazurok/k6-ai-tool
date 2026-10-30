@@ -35,6 +35,7 @@ import {
   type StepStat,
   type Verdict,
 } from './model.js';
+import { checkFindings } from './findings.js';
 import { renderHtml, renderMarkdown } from './render.js';
 import type { Sources } from './sources.js';
 import { verifyHtml } from './verify.js';
@@ -327,14 +328,40 @@ export async function renderRunReport(runDir: string, opts: BuildOptions = {}): 
   return result;
 }
 
+export interface VerifyOptions extends BuildOptions {
+  /** The ids of knowledge/references.md. When given, findings.md is also linted (findings.ts): every cited number and `[ref:id]` checked, no number left uncited. */
+  refs?: Set<string>;
+}
+
+export interface VerifyResult {
+  /** Number elements of report.html checked against the files (those of findings.md included). */
+  checked: number;
+  mismatches: string[];
+  /** With `refs`: the citations and references of findings.md that passed. */
+  findings?: { numbers: number; references: number };
+}
+
 /**
  * Check every number of the folder's report.html against the folder's files: its `data-src` is evaluated again and must
  * give the text shown. Nothing outside the run folder is read (an older folder without the snapshot aside, see loadRun).
+ * With `opts.refs`, findings.md is linted as well and its problems are listed with the mismatches.
  * @throws {Error} when the folder has no report.html
  */
-export async function verifyRunReport(runDir: string, opts: BuildOptions = {}): Promise<{ checked: number; mismatches: string[] }> {
-  const { sources } = await loadRun(runDir, opts);
+export async function verifyRunReport(runDir: string, opts: VerifyOptions = {}): Promise<VerifyResult> {
+  const { refs, ...build } = opts;
+  const { sources } = await loadRun(runDir, build);
   const html = await readText(join(runDir, 'report.html'));
   if (html === undefined) throw new Error(`${join(runDir, 'report.html')} does not exist: write it with \`perf report\` first`);
-  return verifyHtml(html, sources);
+  const result: VerifyResult = verifyHtml(html, sources);
+  if (refs) {
+    const findings = await readText(join(runDir, 'findings.md'));
+    if (findings === undefined) {
+      result.mismatches.push(`${join(runDir, 'findings.md')} does not exist: there is nothing to verify`);
+    } else {
+      const check = checkFindings(findings, sources, refs);
+      result.mismatches.push(...check.problems.map((problem) => `findings.md: ${problem}`));
+      result.findings = { numbers: check.numbers, references: check.references };
+    }
+  }
+  return result;
 }

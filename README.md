@@ -132,7 +132,7 @@ Run them from the repo root. `<runDir>` is a folder under `results/`.
 | `… run … --dry-run` | Shows users, req/s, duration, abort limits and the exact k6 command. Sends nothing, takes no lock, writes nothing. The guardrails still apply: outside the window a load dry run is refused. |
 | `npm run perf -- check <project> <feature> --env <env>` | Checks `journey.yaml` against the env's swagger without running anything. Prints `0 problems` when it is fine. |
 | `npm run perf -- setup <project> --env <env>` / `teardown …` | Create (idempotently) or remove a project's standing test data, for projects that have any. `teardown` deletes what the tests search, so run it only when told to. Neither is bound by the caps or the load window: the project's adapter owns their pace. |
-| `npm run perf -- report <runDir> [--verify-sources]` | Rewrite the report of a run folder; `--verify-sources` checks every number on the page against the run's files. |
+| `npm run perf -- report <runDir> [--verify-sources\|--verify-findings]` | Rewrite the report of a run folder; `--verify-sources` checks every number on the page against the run's files, `--verify-findings` does that and also checks that every number in `findings.md` is cited (section 7). |
 | `npm run perf -- baseline accept <runDir>` | Make a run the reference that later runs of the same feature, env and profile are compared with. It refuses a smoke, FAIL or INVALID run. It is written to `baseline.json` in the feature's folder; commit it if the team should share it. Reports already written, and a re-render of them, keep the baseline their run was judged against. |
 | `npm run perf -- compare <runDirA> <runDirB>` | Table of the p95 per step in two runs, with the change in percent. |
 | `npm run perf -- har-summary <har> --api <url> --out <json>` | Scrub a recorded HAR to the evidence a journey cites (method, path, status, body shape; no headers or tokens). |
@@ -415,6 +415,27 @@ recommendations**.
 `timeseries.json`, `db.json` and `meta.json`; every number in `report.html` carries a `data-src` attribute that names the
 file and the path it came from. To check them, run `npm run perf -- report <runDir> --verify-sources`: it prints
 `all N numbers traced`, or the numbers that differ from their source (exit code 1). Use it before you quote a figure.
+
+**Citing a number in `findings.md`.** A number in `findings.md` is written with the source it came from, directly after it
+with no space: `<number>[[<format>|<source>]]`. The source is the same expression the report uses (`<file>#<path>`, with
+arithmetic if needed) and the format one of `int`, `dec1`, `dec2`, `pct`, `pctPoints`, `signedInt`, `signedPct`, `dur`,
+`ratio`. A unit goes between the number and the brackets and stays outside the format:
+
+```text
+The p95 of items.search was 433 ms[[int|summary.json#metrics["http_req_duration{name:items.search}"].values["p(95)"]]]
+and 1.2%[[pct|summary.json#metrics.http_req_failed.values.rate]] of its requests failed [ref:nielsen-response-times].
+```
+
+The number must be what the format gives for the source: `0.43 s` against a p95 in milliseconds is wrong (write `433 ms` with
+`int`), and `pct` takes a fraction (0.012 reads 1.2%) while `pctPoints` takes a value that is already a percent. In the
+report each cited number becomes a number element like the rest, so `--verify-sources` traces it. `[ref:<id>]` cites an entry
+of `knowledge/references.md` and shows as `[id]`. To check the file, run
+`npm run perf -- report <runDir> --verify-findings`: it does what `--verify-sources` does, then reads `findings.md` and prints
+`findings: N numbers traced, M references`, or one line per problem (exit code 1): a number that differs from its source, an
+unknown format or reference, a malformed citation, or a number with no citation (`uncited number "433" in line 7`). Only
+numbers count: a token that starts with a digit (after an optional `+` or `-`), such as `433`, `1,446`, `12%` or `5 users`.
+Free text may hold identifiers with letters before the digits (`p95`, `k6`, `S1`, `UTF-8`, `items.b2`, `p(95)`), headings,
+list markers, anything in `` `inline code` `` or a fenced block, and the dates and times of a line that starts with `Run:`.
 
 ## 8. Glossary
 

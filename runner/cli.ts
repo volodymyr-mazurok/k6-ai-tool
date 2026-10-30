@@ -14,6 +14,7 @@ import { doctor, formatCheck } from './doctor.js';
 import { formatDryRun, planRun } from './dryRun.js';
 import { acquireEnvLock, checkEnv, GuardrailError, type ProfileType } from './guardrails.js';
 import { summarizeHar } from './har.js';
+import { referenceIds } from './knowledge.js';
 import { NotARunFolderError, renderRunReport, verifyRunReport } from './report/build.js';
 import { runFeature, RunInterruptedError } from './run.js';
 import type { Verdict } from './report/model.js';
@@ -46,10 +47,12 @@ Commands:
       (a value that looks like a number becomes a number). Which keys exist is the project's business; the adapter says what it needs.
   teardown <project> --env <env>
       Remove the standing test data the setup created (only rows the project's own naming marks as its own).
-  report <runDir> [--verify-sources]
+  report <runDir> [--verify-sources | --verify-findings]
       Write report.html and report.md for a run folder (a run writes them itself at its end; use this to redo them after a
       change to findings.md or to the report code). --verify-sources then checks every number on the page against the folder's
-      files and prints "all N numbers traced", or the numbers that differ (exit code 1).
+      files and prints "all N numbers traced", or the numbers that differ (exit code 1). --verify-findings does that too and
+      checks findings.md: every number is written N[[format|source]] and gives N, every [ref:id] is in knowledge/references.md,
+      and no number stands uncited. Prints "findings: N numbers traced, M references", or the problems (exit code 1).
   har-summary <har> --api <url> --out <json>
       Write the scrubbed summary of a recorded HAR (method, path, status, ms, request body, response top-level keys of the
       calls under --api; no headers, cookies or tokens) as evidence for a journey. Delete the raw HAR afterwards. Exits 1 with
@@ -205,7 +208,7 @@ async function teardownCommand(args: string[]): Promise<number> {
 }
 
 async function reportCommand(args: string[]): Promise<number> {
-  const { values, positionals } = parseArgs({ args, allowPositionals: true, options: { 'verify-sources': { type: 'boolean', default: false } } });
+  const { values, positionals } = parseArgs({ args, allowPositionals: true, options: { 'verify-sources': { type: 'boolean', default: false }, 'verify-findings': { type: 'boolean', default: false } } });
   const [dir, ...extra] = positionals;
   if (!dir || extra.length > 0) throw new UsageError('report needs <runDir>');
   const runDir = resolve(dir);
@@ -217,6 +220,7 @@ async function reportCommand(args: string[]): Promise<number> {
     return 1;
   }
   console.log(`perf: report written: ${join(runDir, 'report.html')} (and report.md)`);
+  if (values['verify-findings']) return verifyFindingsCommand(runDir);
   if (!values['verify-sources']) return 0;
 
   const { checked, mismatches } = await verifyRunReport(runDir);
@@ -226,6 +230,28 @@ async function reportCommand(args: string[]): Promise<number> {
     return 1;
   }
   console.log(`perf: all ${checked} numbers traced`);
+  return 0;
+}
+
+/** The ids of knowledge/references.md; none when the file is not there (every [ref:id] is then unknown). */
+async function knownReferences(): Promise<Set<string>> {
+  try {
+    return await referenceIds();
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === 'ENOENT') return new Set();
+    throw err;
+  }
+}
+
+/** `perf report <runDir> --verify-findings`: the page's numbers, then findings.md's citations, references and uncited numbers. */
+async function verifyFindingsCommand(runDir: string): Promise<number> {
+  const { mismatches, findings } = await verifyRunReport(runDir, { refs: await knownReferences() });
+  if (mismatches.length > 0) {
+    for (const mismatch of mismatches) console.log(`perf: ${mismatch}`);
+    console.log(`perf: ${mismatches.length} problem${mismatches.length === 1 ? '' : 's'} in the report or findings.md`);
+    return 1;
+  }
+  console.log(`perf: findings: ${findings!.numbers} numbers traced, ${findings!.references} references`);
   return 0;
 }
 

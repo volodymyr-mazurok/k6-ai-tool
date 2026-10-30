@@ -52,6 +52,7 @@ npm run perf -- run <project> <feature> --profile smoke --env <env>
 npm run perf -- run <project> <feature> --profile load --env <env> --dry-run
 npm run perf -- selftest                   # known-answer test against the local mock, about 10 minutes
 npm run perf -- report <runDir> --verify-sources
+npm run perf -- report <runDir> --verify-findings    # also: every number in findings.md is cited N[[fmt|source]] (README section 7)
 npm run mock                               # local mock server on port 4010
 scripts/check-shared.sh                    # HEAD without any real project: npm ci, test, tsc, word grep (shared files only)
 ```

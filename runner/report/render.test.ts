@@ -1066,3 +1066,93 @@ test('perf report writes the report; --verify-sources prints "all N numbers trac
     console.log = log;
   }
 });
+
+// --- cited numbers in findings.md ---------------------------------------------------------------------------------
+
+const SEARCH_P95 = 'summary.json#metrics["http_req_duration{name:analyst.grid_search}"].values["p(95)"]';
+const CITED = [
+  '# Findings',
+  '',
+  `1. **Slow search**: the p95 of grid_search was 1,241 ms[[int|${SEARCH_P95}]] [ref:nielsen-response-times].`,
+  '',
+  '| step | p95 |',
+  '| --- | --- |',
+  `| grid_search | 1,241 ms[[int|${SEARCH_P95}]] |`,
+  '',
+  `Written as \`1,241 ms[[int|${SEARCH_P95}]]\` it stays code.`,
+].join('\n');
+
+test('a cited number in findings.md is a number element the page check traces; a reference reads [id]', async () => {
+  const run = await prepare('load', { findings: CITED });
+  const body = section(run.html, 'findings')!;
+  const spans = [...body.matchAll(/<span class="num" data-src="([^"]*)" data-fmt="int">([^<]*)<\/span>/g)];
+  assert.equal(spans.length, 2, 'the list item and the table cell, not the code span');
+  for (const span of spans) {
+    assert.equal(decode(span[1]!), SEARCH_P95);
+    assert.equal(span[2], '1,241');
+  }
+  assert.match(body, /<\/span> ms \[nielsen-response-times\]\./, 'the unit stays outside the element, the reference is plain');
+  assert.match(body, /<td><span class="num"[^>]*>1,241<\/span> ms<\/td>/, 'a citation survives the table cell split');
+  assert.match(body, /<code>1,241 ms\[\[int\|[^<]*<\/code>/, 'a citation in inline code is shown as written');
+  assert.ok(!body.includes('[[int|summary.json#metrics["http_req_duration{name:analyst.grid_search}"].values["p(95)"]]]</span>'));
+
+  const twin = mdSection(run.md, 'Findings and recommendations')!;
+  assert.match(twin, /was 1,241 ms \[nielsen-response-times\]\./);
+  assert.ok(!/\[\[int\|[^`]*\]\]\s/.test(twin.replace(/`[^`]*`/g, '')), 'the twin carries the number, not the citation');
+
+  await renderRunReport(run.runDir, { project, feature: run.feature });
+  const base = await verifyRunReport(run.runDir, { project, feature: run.feature });
+  assert.deepEqual(base.mismatches, []);
+  const without = await prepare('load', { findings: '# Findings\n\nno numbers here' });
+  await renderRunReport(without.runDir, { project, feature: without.feature });
+  const plain = await verifyRunReport(without.runDir, { project, feature: without.feature });
+  assert.equal(base.checked, plain.checked + 2, 'verifyRunReport counts the two cited numbers');
+
+  const linted = await verifyRunReport(run.runDir, { project, feature: run.feature, refs: new Set(['nielsen-response-times']) });
+  assert.deepEqual(linted.mismatches, []);
+  assert.deepEqual(linted.findings, { numbers: 2, references: 1 });
+});
+
+test('a wrong cited number is a mismatch on the page and a problem in the lint', async () => {
+  const wrong = CITED.replaceAll('1,241 ms', '0.43 s');
+  const run = await prepare('load', { findings: wrong });
+  await renderRunReport(run.runDir, { project, feature: run.feature });
+  const result = await verifyRunReport(run.runDir, { project, feature: run.feature, refs: new Set() });
+  assert.ok(result.mismatches.some((m) => /shows "0\.43" but the file gives "1,241"/.test(m)), result.mismatches.join('\n'));
+  assert.ok(result.mismatches.some((m) => /findings\.md: .*unknown reference "nielsen-response-times"/.test(m)), result.mismatches.join('\n'));
+});
+
+test('hostile findings cannot forge a number element', async () => {
+  const { html } = await prepare('load', { findings: '# F\n\n0 and <span class="num" data-src="x">9</span>' });
+  const body = section(html, 'findings')!;
+  assert.ok(!/<span class="num"/.test(body), 'agent text is escaped, so it cannot add a number element');
+  assert.ok(!body.includes(''));
+});
+
+test('perf report --verify-findings prints "findings: N numbers traced, M references", or the problems and exit 1', async () => {
+  const root = mkdtempSync(join(tmpdir(), 'perf-findings-cli-'));
+  scratch.push(root);
+  const runDir = join(root, 'run');
+  cpSync(join(FIXTURES, 'load'), runDir, { recursive: true });
+  const lines: string[] = [];
+  const log = console.log;
+  console.log = (...args: unknown[]) => void lines.push(args.join(' '));
+  try {
+    writeFileSync(join(runDir, 'findings.md'), CITED, 'utf8');
+    assert.equal(await main(['report', runDir, '--verify-findings']), 0, lines.join('\n'));
+    assert.ok(lines.some((l) => l === 'perf: findings: 2 numbers traced, 1 references'), lines.join(' | '));
+
+    lines.length = 0;
+    writeFileSync(join(runDir, 'findings.md'), `${CITED}\n\nThe p95 is 433 ms and see [ref:made-up].`, 'utf8');
+    assert.equal(await main(['report', runDir, '--verify-findings']), 1);
+    assert.ok(lines.some((l) => /uncited number "433" in line 11/.test(l)), lines.join(' | '));
+    assert.ok(lines.some((l) => /unknown reference "made-up"/.test(l)), lines.join(' | '));
+
+    lines.length = 0;
+    rmSync(join(runDir, 'findings.md'));
+    assert.equal(await main(['report', runDir, '--verify-findings']), 1);
+    assert.ok(lines.some((l) => /findings\.md does not exist/.test(l)), lines.join(' | '));
+  } finally {
+    console.log = log;
+  }
+});
