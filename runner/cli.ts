@@ -9,7 +9,7 @@ import { parseArgs } from 'node:util';
 import { loadAdapter } from './adapter.js';
 import { acceptBaseline, BaselineRefusedError, compareRuns } from './baseline.js';
 import { checkFeature, formatProblem, JourneyCheckError, SwaggerError } from './checks.js';
-import { ConfigError, loadFeature, loadProject, type Project } from './config.js';
+import { ConfigError, loadFeature, loadProject, REPO_ROOT, type Project } from './config.js';
 import { doctor, formatCheck } from './doctor.js';
 import { formatDryRun, planRun } from './dryRun.js';
 import { acquireEnvLock, checkEnv, GuardrailError, type ProfileType } from './guardrails.js';
@@ -233,12 +233,12 @@ async function reportCommand(args: string[]): Promise<number> {
   return 0;
 }
 
-/** The ids of knowledge/references.md; none when the file is not there (every [ref:id] is then unknown). */
+/** The ids of the repo's knowledge/references.md (found from the runner's own location, whatever the current directory is). */
 async function knownReferences(): Promise<Set<string>> {
   try {
-    return await referenceIds();
+    return await referenceIds(REPO_ROOT);
   } catch (err) {
-    if ((err as NodeJS.ErrnoException).code === 'ENOENT') return new Set();
+    if ((err as NodeJS.ErrnoException).code === 'ENOENT') throw new Error(`knowledge/references.md not found under ${REPO_ROOT}`);
     throw err;
   }
 }

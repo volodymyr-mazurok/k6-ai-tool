@@ -1118,7 +1118,8 @@ test('a wrong cited number is a mismatch on the page and a problem in the lint',
   const run = await prepare('load', { findings: wrong });
   await renderRunReport(run.runDir, { project, feature: run.feature });
   const result = await verifyRunReport(run.runDir, { project, feature: run.feature, refs: new Set() });
-  assert.ok(result.mismatches.some((m) => /shows "0\.43" but the file gives "1,241"/.test(m)), result.mismatches.join('\n'));
+  assert.equal(result.mismatches.filter((m) => /0\.43/.test(m)).length, 2, 'one line for each of the two wrong citations, none twice');
+  assert.ok(result.mismatches.every((m) => !/shows "0\.43"/.test(m)), 'the page check does not repeat the lint');
   assert.ok(result.mismatches.some((m) => /findings\.md: .*unknown reference "nielsen-response-times"/.test(m)), result.mismatches.join('\n'));
 });
 
@@ -1147,6 +1148,18 @@ test('perf report --verify-findings prints "findings: N numbers traced, M refere
     assert.equal(await main(['report', runDir, '--verify-findings']), 1);
     assert.ok(lines.some((l) => /uncited number "433" in line 11/.test(l)), lines.join(' | '));
     assert.ok(lines.some((l) => /unknown reference "made-up"/.test(l)), lines.join(' | '));
+
+    // from another directory the repo's own references are still found
+    lines.length = 0;
+    writeFileSync(join(runDir, 'findings.md'), CITED, 'utf8');
+    const here = process.cwd();
+    process.chdir(root);
+    try {
+      assert.equal(await main(['report', runDir, '--verify-findings']), 0, lines.join('\n'));
+    } finally {
+      process.chdir(here);
+    }
+    assert.ok(lines.some((l) => l === 'perf: findings: 2 numbers traced, 1 references'), lines.join(' | '));
 
     lines.length = 0;
     rmSync(join(runDir, 'findings.md'));

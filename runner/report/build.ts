@@ -352,7 +352,8 @@ export async function verifyRunReport(runDir: string, opts: VerifyOptions = {}):
   const { sources } = await loadRun(runDir, build);
   const html = await readText(join(runDir, 'report.html'));
   if (html === undefined) throw new Error(`${join(runDir, 'report.html')} does not exist: write it with \`perf report\` first`);
-  const result: VerifyResult = verifyHtml(html, sources);
+  // With `refs` the lint below checks the findings' cited numbers, so the page check leaves that section out: one line per wrong citation
+  const result: VerifyResult = verifyHtml(refs ? html.replace(/<section id="findings">[\s\S]*?<\/section>/, '') : html, sources);
   if (refs) {
     const findings = await readText(join(runDir, 'findings.md'));
     if (findings === undefined) {
@@ -360,6 +361,7 @@ export async function verifyRunReport(runDir: string, opts: VerifyOptions = {}):
     } else {
       const check = checkFindings(findings, sources, refs);
       result.mismatches.push(...check.problems.map((problem) => `findings.md: ${problem}`));
+      result.checked += check.numbers;
       result.findings = { numbers: check.numbers, references: check.references };
     }
   }
