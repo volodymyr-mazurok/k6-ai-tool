@@ -211,39 +211,59 @@ export async function record(opts: RecordOptions): Promise<RecordResult> {
     });
     // A headless (driven) session stays on the start url's origin: a click on a link or a redirect cannot take it elsewhere.
     let offOrigin: string | undefined;
+    let callbackError: unknown;
     const home = new URL(startUrl).origin;
     if (headless) {
-      await context.route('**/*', (route) => {
-        const request = route.request();
-        if (request.isNavigationRequest() && request.frame().parentFrame() === null) {
-          let target: URL | undefined;
+      await context.route('**/*', async (route) => {
+        try {
+          const request = route.request();
+          // The first request of a new window (window.open, target=_blank) has no frame yet: request.frame() throws, and that
+          // request is always the new window's main frame.
+          let isMainFrame = true;
           try {
-            target = new URL(request.url());
+            isMainFrame = request.frame().parentFrame() === null;
           } catch {
-            /* unparseable: treated as off-origin below */
+            /* a popup's first request */
           }
-          if (target?.origin !== home && target?.href !== 'about:blank') {
-            offOrigin ??= target ? target.host || target.protocol : 'an unparseable url';
-            return route.abort('blockedbyclient');
+          if (request.isNavigationRequest() && isMainFrame) {
+            let target: URL | undefined;
+            try {
+              target = new URL(request.url());
+            } catch {
+              /* unparseable: treated as off-origin below */
+            }
+            if (target?.origin !== home && target?.href !== 'about:blank') {
+              offOrigin ??= target ? target.host || target.protocol : 'an unparseable url';
+              await route.abort('blockedbyclient');
+              return;
+            }
           }
+          await route.continue();
+        } catch (err) {
+          // Nothing may escape a callback (Node would exit without the cleanup below): keep the error for the session to throw.
+          callbackError ??= err;
+          await route.abort().catch(() => {});
         }
-        return route.continue();
       });
     }
     // A server redirect is followed inside the browser without a second route call, so the page's own navigations are watched too:
     // an off-origin main frame (any page, popups included) is noted and its page closed, which stops the actions that follow.
     const watchNavigation = (p: Page): void => {
       p.on('framenavigated', (frame) => {
-        if (frame.parentFrame() !== null) return;
-        let target: URL | undefined;
         try {
-          target = new URL(frame.url());
-        } catch {
-          /* unparseable */
+          if (frame.parentFrame() !== null) return;
+          let target: URL | undefined;
+          try {
+            target = new URL(frame.url());
+          } catch {
+            /* unparseable */
+          }
+          if (target?.origin === home || target?.href === 'about:blank') return;
+          offOrigin ??= target ? target.host || target.protocol : 'an unparseable url';
+          void p.close().catch(() => {});
+        } catch (err) {
+          callbackError ??= err;
         }
-        if (target?.origin === home || target?.href === 'about:blank') return;
-        offOrigin ??= target ? target.host || target.protocol : 'an unparseable url';
-        void p.close().catch(() => {});
       });
     };
     if (headless) context.on('page', watchNavigation);
@@ -258,9 +278,10 @@ export async function record(opts: RecordOptions): Promise<RecordResult> {
       try {
         await opts.drive(page);
       } catch (err) {
-        throw offOrigin ? refuseOffOrigin() : err; // the aborted navigation is the cause
+        throw offOrigin ? refuseOffOrigin() : (callbackError ?? err); // the aborted navigation is the cause
       }
       if (offOrigin) throw refuseOffOrigin();
+      if (callbackError) throw callbackError;
     } else {
       log('drive the app in the browser window; log in yourself if asked; close the window when done');
       await new Promise<void>((resolve) => {

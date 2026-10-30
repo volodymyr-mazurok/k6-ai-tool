@@ -69,7 +69,7 @@ const ROOT_HTML =
 // the button is pressed, with what was typed in the box. `/app?away=<url>` adds a link to <url> (a test of leaving the origin).
 // /login and /plain-login are pages with password-like fields, for the tests that must refuse to fill them.
 const APP_HTML = `<!doctype html><html><head><title>Perf mock page</title></head><body>
-<input id="q" type="text" placeholder="search"><button id="go" type="button">Search</button><span id="out"></span>
+<input id="q" type="text" placeholder="search"><button id="go" type="button">Search</button><span id="out"></span><a id="blank" target="_blank" href="/app">new tab</a>
 <script>
 let token;
 async function signIn() {

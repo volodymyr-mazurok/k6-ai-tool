@@ -279,6 +279,57 @@ test('a headless session cannot be taken off the start origin by a click or a re
   }
 });
 
+test('a same-origin popup (window.open, target=_blank) does not crash the session; the recording proceeds', browser, async () => {
+  const { dir, tmp, out } = await scratch();
+  const result = await record({
+    startUrl: `${mock.url}/app`,
+    apiUrl: `${mock.url}/api`,
+    out,
+    headless: true,
+    tmpDir: tmp,
+    drive: async (page) => {
+      await page.evaluate(() => void window.open('/app'));
+      await page.waitForTimeout(500);
+      await page.click('#blank');
+      await page.waitForTimeout(500);
+      await page.waitForLoadState('networkidle');
+    },
+  });
+  assert.ok(result.calls >= 3, `the page and both popups searched (got ${result.calls})`);
+  assert.deepEqual(readdirSync(tmp), []);
+
+  const run = await cli('record', 'selftest', '--env', 'local', '--start', `${mock.url}/app`, '--out', join(dir, 'popup.json'), '--actions',
+    await actionsFile(dir, [{ click: '#blank' }, { wait: 500 }]));
+  assert.equal(run.code, 0, run.err);
+});
+
+test('an off-origin popup is refused with ConfigError and leaves no temp folder, no handlers and nothing written', browser, async () => {
+  const other = await startMockServer();
+  try {
+    const { tmp, out } = await scratch();
+    const listeners = process.listenerCount('SIGINT');
+    await assert.rejects(
+      record({
+        startUrl: `${mock.url}/app`,
+        apiUrl: `${mock.url}/api`,
+        out,
+        headless: true,
+        tmpDir: tmp,
+        drive: async (page) => {
+          await page.evaluate((url) => void window.open(url), `${other.url}/app`);
+          await page.waitForTimeout(500);
+        },
+      }),
+      (err: unknown) => err instanceof ConfigError && new RegExp(`navigation to ${new URL(other.url).host.replace('.', '\\.')} refused`).test(err.message),
+    );
+    assert.deepEqual(readdirSync(tmp), []);
+    assert.equal(existsSync(out), false);
+    assert.equal(process.listenerCount('SIGINT'), listeners, 'the signal handlers are removed');
+  } finally {
+    await other.stop();
+  }
+});
+
 // A signal must not leave the raw HAR in the temp folder. The child records headless and waits forever; the test kills it.
 for (const [signal, code] of [['SIGINT', 130], ['SIGTERM', 143], ['SIGHUP', 129]] as const) {
   test(`${signal} while recording removes the temp folder and exits ${code}`, browser, async () => {
