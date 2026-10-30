@@ -66,9 +66,10 @@ const ROOT_HTML =
   '<body><app-root></app-root><script src="main-SELFTEST.js"></script></body></html>';
 
 // A tiny page for the browser tests (perf record): it signs in with the mock's own login, searches on load and again when
-// the button is pressed, with what was typed in the box. The password field is there so a test can try to fill it.
+// the button is pressed, with what was typed in the box. `/app?away=<url>` adds a link to <url> (a test of leaving the origin).
+// /login and /plain-login are pages with password-like fields, for the tests that must refuse to fill them.
 const APP_HTML = `<!doctype html><html><head><title>Perf mock page</title></head><body>
-<input id="q" type="text" placeholder="search"><input id="pw" type="password"><button id="go" type="button">Search</button><span id="out"></span>
+<input id="q" type="text" placeholder="search"><button id="go" type="button">Search</button><span id="out"></span>
 <script>
 let token;
 async function signIn() {
@@ -90,9 +91,30 @@ async function search(query) {
   });
   document.getElementById('out').textContent = 'status ' + res.status;
 }
+const away = new URLSearchParams(location.search).get('away');
+if (away) {
+  const link = document.createElement('a');
+  link.id = 'away';
+  link.href = away;
+  link.textContent = 'elsewhere';
+  document.body.append(link);
+}
 document.getElementById('go').addEventListener('click', () => search(document.getElementById('q').value));
 search('');
 </script></body></html>`;
+
+const LOGIN_HTML =
+  '<!doctype html><html><head><title>Perf mock login</title></head><body>' +
+  '<input id="user" type="text" name="username"><input id="pw" type="password"></body></html>';
+
+// Password-like fields that are NOT type=password: found by their name, placeholder, label or aria-label.
+const PLAIN_LOGIN_HTML =
+  '<!doctype html><html><head><title>Perf mock plain login</title></head><body>' +
+  '<input id="secret" type="text" name="password">' +
+  '<input id="ph" type="text" name="a" placeholder="Password">' +
+  '<label for="lbl">Your passcode</label><input id="lbl" type="text">' +
+  '<input id="aria" type="text" aria-label="PIN / pwd">' +
+  '<input id="ok" type="text" name="city" placeholder="City"></body></html>';
 
 /** A semaphore with a bounded wait queue: acquire() resolves false when the queue is already full. */
 class SlotQueue {
@@ -209,6 +231,13 @@ export async function startMockServer(opts: MockServerOptions = {}): Promise<Moc
     if (route === 'GET /swagger/v1/swagger.json') return sendJson(res, 200, SWAGGER);
     if (route === 'GET /') return send(res, 200, 'text/html; charset=utf-8', ROOT_HTML);
     if (route === 'GET /app') return send(res, 200, 'text/html; charset=utf-8', APP_HTML);
+    if (route === 'GET /login') return send(res, 200, 'text/html; charset=utf-8', LOGIN_HTML);
+    if (route === 'GET /plain-login') return send(res, 200, 'text/html; charset=utf-8', PLAIN_LOGIN_HTML);
+    if (route === 'GET /redirect') {
+      const to = new URL(req.url ?? '/', 'http://mock').searchParams.get('to') ?? '/';
+      res.writeHead(302, { location: to });
+      return void res.end();
+    }
 
     if (!hasBearerToken(req)) return sendJson(res, 401, { error: 'unauthorized' });
     const apiRoute = apiRoutes[route];

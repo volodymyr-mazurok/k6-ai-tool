@@ -74,8 +74,9 @@ Commands:
       Exits 1 and writes nothing when no call under the env's api url was recorded (the api url is probably wrong).
       --actions <file>    no window: headless, run a JSON list of actions, then close. Each element is one of
                           {"goto":"<url>"}, {"click":"<selector>"}, {"fill":["<selector>","<text>"]}, {"wait":<ms>}.
-                          Unknown keys are refused (exit code 2); a goto may not leave --start's origin, --start must be on
-                          the env's app url, and a password field cannot be filled (log in with a window instead).
+                          Unknown keys are refused (exit code 2); the session may not leave --start's origin (goto, click
+                          or redirect; refused, exit code 2), --start must be on the env's app url, and nothing is filled on a
+                          page with a password field or into a password-like field (log in with a window instead).
   baseline accept <runDir>
       Make a run the reference for its feature, env and profile: its per-step p50/p95/p99, error rate and req/s go to that slot
       of the feature's baseline.json (other slots stay; an earlier baseline of the slot is replaced). Refuses a smoke, FAIL or

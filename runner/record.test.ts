@@ -1,9 +1,11 @@
 import assert from 'node:assert/strict';
+import { spawn } from 'node:child_process';
 import { existsSync, readdirSync } from 'node:fs';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, before, test } from 'node:test';
+import { fileURLToPath } from 'node:url';
 import { main } from './cli.js';
 import { ConfigError } from './config.js';
 import type { HarEntrySummary } from './har.js';
@@ -221,15 +223,91 @@ test('perf record exits 1 with the wrong-api-url message when no call reached th
   assert.equal(existsSync(authPath(out)), false);
 });
 
-test('perf record --actions refuses to fill a password field (exit 2) and leaves nothing', browser, async () => {
+test('perf record --actions refuses to fill a password field, or anything on a page that has one (exit 2), and leaves nothing', browser, async () => {
   const { dir, out } = await scratch();
-  const actions = await actionsFile(dir, [{ fill: ['#pw', 'hunter2-secret'] }]);
-  const run = await cli('record', 'selftest', '--env', 'local', '--start', `${mock.url}/app`, '--out', out, '--actions', actions);
-  assert.equal(run.code, 2);
-  assert.match(run.err, /password field/);
-  assert.ok(!(run.out + run.err).includes('hunter2'));
+  for (const selector of ['#pw', '#user']) {
+    const actions = await actionsFile(dir, [{ fill: [selector, 'hunter2-secret'] }]);
+    const run = await cli('record', 'selftest', '--env', 'local', '--start', `${mock.url}/login`, '--out', out, '--actions', actions);
+    assert.equal(run.code, 2, selector);
+    assert.match(run.err, /password field/);
+    assert.ok(!(run.out + run.err).includes('hunter2'));
+    assert.equal(existsSync(out), false);
+  }
+});
+
+test('perf record --actions refuses a text field that is named, labelled or described as a password (exit 2); other fields stay fillable', browser, async () => {
+  const { dir, out } = await scratch();
+  for (const selector of ['#secret', '#ph', '#lbl', '#aria']) {
+    const actions = await actionsFile(dir, [{ fill: [selector, 'hunter2-secret'] }]);
+    const run = await cli('record', 'selftest', '--env', 'local', '--start', `${mock.url}/plain-login`, '--out', out, '--actions', actions);
+    assert.equal(run.code, 2, selector);
+    assert.match(run.err, /password field/);
+    assert.ok(!(run.out + run.err).includes('hunter2'));
+  }
+  // an ordinary field is filled: the run then fails only because that page makes no API call
+  const ok = await cli('record', 'selftest', '--env', 'local', '--start', `${mock.url}/plain-login`, '--out', out, '--actions', await actionsFile(dir, [{ fill: ['#ok', 'Paris'] }]));
+  assert.equal(ok.code, 1, ok.err);
   assert.equal(existsSync(out), false);
 });
+
+test('a headless session cannot be taken off the start origin by a click or a redirect (exit 2, nothing written)', browser, async () => {
+  const other = await startMockServer();
+  try {
+    const { dir, tmp, out } = await scratch();
+    const otherHost = new URL(other.url).host;
+
+    const click = await cli('record', 'selftest', '--env', 'local', '--start', `${mock.url}/app?away=${encodeURIComponent(`${other.url}/app`)}`, '--out', out, '--actions',
+      await actionsFile(dir, [{ click: '#away' }, { wait: 300 }, { click: '#go' }]));
+    assert.equal(click.code, 2, click.err);
+    assert.match(click.err, new RegExp(`navigation to ${otherHost.replace('.', '\\.')} refused`));
+    assert.equal(existsSync(out), false);
+
+    const redirect = await cli('record', 'selftest', '--env', 'local', '--start', `${mock.url}/app`, '--out', out, '--actions',
+      await actionsFile(dir, [{ goto: `/redirect?to=${encodeURIComponent(`${other.url}/app`)}` }]));
+    assert.equal(redirect.code, 2, redirect.err);
+    assert.match(redirect.err, /refused/);
+    assert.equal(existsSync(out), false);
+
+    // the library's headless drive is confined the same way
+    await assert.rejects(
+      record({ startUrl: `${mock.url}/app?away=${encodeURIComponent(`${other.url}/app`)}`, apiUrl: `${mock.url}/api`, out, headless: true, tmpDir: tmp, drive: async (page) => { await page.click('#away'); await page.waitForTimeout(300); } }),
+      (err: unknown) => err instanceof ConfigError && /refused/.test(err.message),
+    );
+    assert.deepEqual(readdirSync(tmp), []);
+  } finally {
+    await other.stop();
+  }
+});
+
+// A signal must not leave the raw HAR in the temp folder. The child records headless and waits forever; the test kills it.
+for (const [signal, code] of [['SIGINT', 130], ['SIGTERM', 143], ['SIGHUP', 129]] as const) {
+  test(`${signal} while recording removes the temp folder and exits ${code}`, browser, async () => {
+    const { tmp, out } = await scratch();
+    const script = `
+      import { record } from './runner/record.ts';
+      const [startUrl, apiUrl, out, tmpDir] = process.argv.slice(1);
+      await record({ startUrl, apiUrl, out, tmpDir, headless: true, drive: async () => { console.log('READY'); await new Promise(() => {}); } });
+    `;
+    const child = spawn(process.execPath, ['--import', 'tsx', '--input-type=module', '-e', script, `${mock.url}/app`, `${mock.url}/api`, out, tmp], {
+      cwd: fileURLToPath(new URL('..', import.meta.url)),
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    let stderr = '';
+    child.stderr.on('data', (chunk: Buffer) => void (stderr += chunk));
+    await new Promise<void>((resolve, reject) => {
+      child.once('exit', () => reject(new Error(`child ended before READY: ${stderr}`)));
+      child.stdout.on('data', (chunk: Buffer) => {
+        if (chunk.toString().includes('READY')) resolve();
+      });
+    });
+    assert.equal(readdirSync(tmp).length, 1, 'the HAR folder exists while recording');
+    const exited = new Promise<number | null>((resolve) => child.once('exit', (c) => resolve(c)));
+    child.kill(signal);
+    assert.equal(await exited, code);
+    assert.deepEqual(readdirSync(tmp), []);
+    assert.equal(existsSync(out), false);
+  });
+}
 
 test('perf record validates before any browser starts: bad action files, off-origin goto, foreign start url, misuse (exit 2)', async () => {
   const { dir, out } = await scratch();

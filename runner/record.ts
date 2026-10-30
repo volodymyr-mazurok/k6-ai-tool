@@ -8,7 +8,8 @@
 // Two ways to drive the browser:
 //   - headed (default): a window opens at the start url; the PERSON drives it, logs in themselves, and closes the window.
 //   - `drive` (library) or `--actions <file.json>` (CLI): headless, a small list of actions, then the browser closes. The agent
-//     never types a password: an action list may not fill a password field.
+//     never types a password: an action list may not fill a password-like field or anything on a page with a password field,
+//     and a headless session may not navigate away from the start url's origin (click, redirect or goto).
 
 import { mkdirSync, mkdtempSync, existsSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -72,6 +73,8 @@ const ACTION_KEYS = ['goto', 'click', 'fill', 'wait'];
 const MAX_ACTIONS = 200;
 const MAX_WAIT_MS = 30_000;
 const ACTION_TIMEOUT_MS = 15_000;
+/** Exit codes after the signal (128 + number), as a shell reports them. */
+const SIGNAL_EXIT = { SIGINT: 130, SIGTERM: 143, SIGHUP: 129 };
 
 /**
  * Check an action list strictly and resolve each `goto` against the start url. Unknown keys, wrong types, two actions in one
@@ -127,7 +130,32 @@ export function parseActions(json: unknown, startUrl: string): RecordAction[] {
   });
 }
 
-/** The `drive` function for an action list. Refuses to fill a password field (a person types those, never the agent). */
+/** Attribute values, a label or an aria-label that name a password / passcode / pin-like field. Deliberately broad: over-refusing costs little. */
+const PASSWORD_LIKE = /pass(word|wd|code)?|pwd/i;
+
+/** Why a fill must be refused, or undefined when it may go ahead. Never includes the text to be typed. */
+async function passwordFillProblem(page: Page, selector: string, at: string): Promise<string | undefined> {
+  const hints = await page.locator(selector).first().evaluate((el) => {
+    const input = el as HTMLInputElement;
+    const labelled = (input.getAttribute('aria-labelledby') ?? '')
+      .split(/\s+/)
+      .map((id) => document.getElementById(id)?.textContent ?? '');
+    const labels = Array.from(input.labels ?? []).map((label) => label.textContent ?? '');
+    const attrs = ['name', 'id', 'placeholder', 'aria-label', 'autocomplete', 'title'].map((name) => el.getAttribute(name) ?? '');
+    return { type: (input.type ?? '').toLowerCase(), text: [...attrs, ...labels, ...labelled] };
+  });
+  if (hints.type === 'password' || hints.text.some((text) => PASSWORD_LIKE.test(text))) {
+    return `${at}.fill: ${JSON.stringify(selector)} is a password field; log in yourself in a headed recording (leave out --actions)`;
+  }
+  for (const frame of page.frames()) {
+    if ((await frame.locator('input[type="password" i]').count()) > 0) {
+      return `${at}.fill: the page has a password field, so this is a login form; log in yourself in a headed recording (leave out --actions)`;
+    }
+  }
+  return undefined;
+}
+
+/** The `drive` function for an action list. Refuses to fill a login form or a password-like field (a person types those, never the agent). */
 export function driveActions(actions: RecordAction[]): (page: Page) => Promise<void> {
   return async (page) => {
     page.setDefaultTimeout(ACTION_TIMEOUT_MS);
@@ -136,14 +164,9 @@ export function driveActions(actions: RecordAction[]): (page: Page) => Promise<v
       else if ('click' in action) await page.locator(action.click).first().click();
       else if ('wait' in action) await page.waitForTimeout(action.wait);
       else {
-        const field = page.locator(action.fill[0]).first();
-        const isPassword = await field.evaluate(
-          (el) => el instanceof HTMLInputElement && (el.type === 'password' || /password/.test(el.autocomplete)),
-        );
-        if (isPassword) {
-          throw new ConfigError(`--actions[${i}].fill: ${JSON.stringify(action.fill[0])} is a password field; log in yourself in a headed recording (leave out --actions)`);
-        }
-        await field.fill(action.fill[1]);
+        const problem = await passwordFillProblem(page, action.fill[0], `--actions[${i}]`);
+        if (problem) throw new ConfigError(problem);
+        await page.locator(action.fill[0]).first().fill(action.fill[1]);
       }
     }
     await page.waitForLoadState('networkidle').catch(() => {}); // let the last call finish
@@ -156,7 +179,8 @@ export function driveActions(actions: RecordAction[]): (page: Page) => Promise<v
 
 /**
  * Record a browser session and write the scrubbed recording. Writes nothing when no call under `apiUrl` was made (calls: 0).
- * The raw HAR never leaves the temp folder, which is removed in every case, including Ctrl-C.
+ * The raw HAR never leaves the temp folder, which is removed in every case, including SIGINT, SIGTERM and SIGHUP.
+ * A headless session refuses any main-frame navigation off the start url's origin (ConfigError, nothing written).
  * @throws {Error} the browser could not start, or closed before the HAR was saved
  */
 export async function record(opts: RecordOptions): Promise<RecordResult> {
@@ -168,11 +192,15 @@ export async function record(opts: RecordOptions): Promise<RecordResult> {
   const { chromium } = await import('playwright');
   const dir = mkdtempSync(join(opts.tmpDir ?? tmpdir(), 'perf-record-'));
   const harPath = join(dir, 'session.har');
-  const onSigint = (): void => {
-    rmSync(dir, { recursive: true, force: true });
-    process.exit(130);
-  };
-  process.once('SIGINT', onSigint);
+  // Ctrl-C, kill and a closed terminal must not leave the raw HAR behind.
+  const handlers = Object.entries(SIGNAL_EXIT).map(([signal, code]) => {
+    const handler = (): void => {
+      rmSync(dir, { recursive: true, force: true });
+      process.exit(code);
+    };
+    process.once(signal as NodeJS.Signals, handler);
+    return [signal as NodeJS.Signals, handler] as const;
+  });
 
   let browser;
   try {
@@ -181,11 +209,58 @@ export async function record(opts: RecordOptions): Promise<RecordResult> {
       recordHar: { path: harPath, content: 'embed' },
       serviceWorkers: 'block', // a service worker's requests would not reach the HAR
     });
+    // A headless (driven) session stays on the start url's origin: a click on a link or a redirect cannot take it elsewhere.
+    let offOrigin: string | undefined;
+    const home = new URL(startUrl).origin;
+    if (headless) {
+      await context.route('**/*', (route) => {
+        const request = route.request();
+        if (request.isNavigationRequest() && request.frame().parentFrame() === null) {
+          let target: URL | undefined;
+          try {
+            target = new URL(request.url());
+          } catch {
+            /* unparseable: treated as off-origin below */
+          }
+          if (target?.origin !== home && target?.href !== 'about:blank') {
+            offOrigin ??= target ? target.host || target.protocol : 'an unparseable url';
+            return route.abort('blockedbyclient');
+          }
+        }
+        return route.continue();
+      });
+    }
+    // A server redirect is followed inside the browser without a second route call, so the page's own navigations are watched too:
+    // an off-origin main frame (any page, popups included) is noted and its page closed, which stops the actions that follow.
+    const watchNavigation = (p: Page): void => {
+      p.on('framenavigated', (frame) => {
+        if (frame.parentFrame() !== null) return;
+        let target: URL | undefined;
+        try {
+          target = new URL(frame.url());
+        } catch {
+          /* unparseable */
+        }
+        if (target?.origin === home || target?.href === 'about:blank') return;
+        offOrigin ??= target ? target.host || target.protocol : 'an unparseable url';
+        void p.close().catch(() => {});
+      });
+    };
+    if (headless) context.on('page', watchNavigation);
+    const refuseOffOrigin = (): ConfigError =>
+      new ConfigError(`navigation to ${offOrigin} refused: a headless recording stays on ${home}; the recording was not saved`);
+
     const page = await context.newPage();
+    if (headless) watchNavigation(page);
     await page.goto(startUrl);
 
     if (opts.drive) {
-      await opts.drive(page);
+      try {
+        await opts.drive(page);
+      } catch (err) {
+        throw offOrigin ? refuseOffOrigin() : err; // the aborted navigation is the cause
+      }
+      if (offOrigin) throw refuseOffOrigin();
     } else {
       log('drive the app in the browser window; log in yourself if asked; close the window when done');
       await new Promise<void>((resolve) => {
@@ -214,7 +289,7 @@ export async function record(opts: RecordOptions): Promise<RecordResult> {
     writeFileSync(authPath(out), `${JSON.stringify(auth, null, 2)}\n`);
     return { calls: summary.length, auth };
   } finally {
-    process.off('SIGINT', onSigint);
+    for (const [signal, handler] of handlers) process.off(signal, handler);
     await browser?.close().catch(() => {});
     rmSync(dir, { recursive: true, force: true });
   }
