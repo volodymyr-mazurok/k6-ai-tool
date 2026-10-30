@@ -54,6 +54,7 @@ const SWAGGER = JSON.stringify({
   openapi: '3.0.1',
   info: { title: 'Perf mock API', version: 'v1' },
   paths: {
+    '/api/items/count': { get: { operationId: 'ItemsCount', responses: { '200': { description: 'OK' } } } },
     '/api/items/search': { post: { operationId: 'ItemsSearch', responses: { '200': { description: 'OK' } } } },
     '/api/items/slow-search': { post: { operationId: 'ItemsSlowSearch', responses: { '200': { description: 'OK' } } } },
     '/api/items/export': { post: { operationId: 'ItemsExport', responses: { '200': { description: 'OK' } } } },
@@ -63,6 +64,35 @@ const SWAGGER = JSON.stringify({
 const ROOT_HTML =
   '<!doctype html><html><head><title>Perf mock app</title></head>' +
   '<body><app-root></app-root><script src="main-SELFTEST.js"></script></body></html>';
+
+// A tiny page for the browser tests (perf record): it signs in with the mock's own login, searches on load and again when
+// the button is pressed, with what was typed in the box. The password field is there so a test can try to fill it.
+const APP_HTML = `<!doctype html><html><head><title>Perf mock page</title></head><body>
+<input id="q" type="text" placeholder="search"><input id="pw" type="password"><button id="go" type="button">Search</button><span id="out"></span>
+<script>
+let token;
+async function signIn() {
+  if (!token) {
+    const res = await fetch('/oauth/token', {
+      method: 'POST',
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      body: 'grant_type=password&username=${LOGIN}&password=${PASSWORD}',
+    });
+    token = (await res.json()).access_token;
+  }
+  return token;
+}
+async function search(query) {
+  const res = await fetch('/api/items/search', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', authorization: 'Bearer ' + (await signIn()) },
+    body: JSON.stringify({ query, currentPage: 1, currentSize: 20 }),
+  });
+  document.getElementById('out').textContent = 'status ' + res.status;
+}
+document.getElementById('go').addEventListener('click', () => search(document.getElementById('q').value));
+search('');
+</script></body></html>`;
 
 /** A semaphore with a bounded wait queue: acquire() resolves false when the queue is already full. */
 class SlotQueue {
@@ -178,6 +208,7 @@ export async function startMockServer(opts: MockServerOptions = {}): Promise<Moc
     if (route === 'POST /oauth/token') return tokenEndpoint(req, res);
     if (route === 'GET /swagger/v1/swagger.json') return sendJson(res, 200, SWAGGER);
     if (route === 'GET /') return send(res, 200, 'text/html; charset=utf-8', ROOT_HTML);
+    if (route === 'GET /app') return send(res, 200, 'text/html; charset=utf-8', APP_HTML);
 
     if (!hasBearerToken(req)) return sendJson(res, 401, { error: 'unauthorized' });
     const apiRoute = apiRoutes[route];

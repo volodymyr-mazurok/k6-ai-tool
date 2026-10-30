@@ -136,6 +136,7 @@ Run them from the repo root. `<runDir>` is a folder under `results/`.
 | `npm run perf -- report <runDir> [--verify-sources\|--verify-findings]` | Rewrite the report of a run folder; `--verify-sources` checks every number on the page against the run's files, `--verify-findings` does that and also checks that every number in `findings.md` is cited (section 7). |
 | `npm run perf -- baseline accept <runDir>` | Make a run the reference that later runs of the same feature, env and profile are compared with. It refuses a smoke, FAIL or INVALID run. It is written to `baseline.json` in the feature's folder; commit it if the team should share it. Reports already written, and a re-render of them, keep the baseline their run was judged against. |
 | `npm run perf -- compare <runDirA> <runDirB>` | Table of the p95 per step in two runs, with the change in percent. |
+| `npm run perf -- record <project> --env <env> --start <url> --out <recording.json> [--actions <file.json>]` | Record a real browser session as evidence for a journey: a window opens at `--start`, you drive the app (log in yourself if asked) and close the window. Writes `<out>` (the same scrubbed summary `har-summary` makes, of the calls under the env's api url) and `<out minus .json>.auth.json`: how the app signs its calls as a shape (scheme, header name, kind and length of the value such as `JWT` or `16 letters and digits`, number of token requests), never the value. The raw HAR stays in a temp folder and is deleted in every case. Exit 1 and nothing written when no call reached the api url (the url is probably wrong). `--actions` runs headless instead: a JSON list of `{"goto":"<url>"}`, `{"click":"<selector>"}`, `{"fill":["<selector>","<text>"]}`, `{"wait":<ms>}`; unknown keys are refused (exit 2), a `goto` may not leave `--start`'s origin, `--start` must be on the env's app url, and a password field is never filled. Needs Playwright's Chromium (`npx playwright install chromium`, once). |
 | `npm run perf -- har-summary <har> --api <url> --out <json>` | Scrub a recorded HAR to the evidence a journey cites (method, path, status, body shape; no headers or tokens). |
 | `npm run perf -- selftest` | Tests the framework itself against the local mock (about 10 minutes, nothing leaves your machine, needs no `.env`). |
 | `npm run mock` | Starts the local mock server on port 4010. |
@@ -475,8 +476,10 @@ until its smoke is green), **perf-run** and **perf-report**, and a consultant, *
 advice before a run, a plain-language analysis with cited reference points and improvement suggestions after it, and,
 if you want it, guidance from start to end. None of them is built yet. Until they are, do the same steps by hand:
 
-1. Record what the feature really sends: drive the real app (or the matching automated test) with HAR recording, then
-   `npm run perf -- har-summary <har> --api <api url> --out projects/<p>/features/<f>/recordings/<name>.json`, and delete the raw HAR.
+1. Record what the feature really sends: `npm run perf -- record <p> --env <env> --start <app url> --out projects/<p>/features/<f>/recordings/<name>.json`
+   opens a browser, you drive the app and close it, and only the scrubbed recording (and `<name>.auth.json`, the shape of the
+   login) is kept. Or drive the matching automated test with HAR recording, then
+   `npm run perf -- har-summary <har> --api <api url> --out …` and delete the raw HAR.
 2. Write `journey.yaml` (the steps, each with its evidence) and `workload.yaml` (user mix, think time, profile sizes) in
    `projects/<p>/features/<f>/`. Copy the self-test project's (`runner/selftest/project/features/items/`).
 3. Write `<f>.js` the way `items.js` is written: `step()` for every request, a content check in each.

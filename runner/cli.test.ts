@@ -55,7 +55,7 @@ async function cli(...argv: string[]): Promise<Cli> {
 }
 
 // R35: every command the CLI has, each added by the task that built it.
-const COMMANDS = ['doctor', 'setup', 'teardown', 'run', 'check', 'probe', 'har-summary', 'report', 'baseline accept', 'compare', 'selftest'];
+const COMMANDS = ['doctor', 'setup', 'teardown', 'run', 'check', 'probe', 'har-summary', 'record', 'report', 'baseline accept', 'compare', 'selftest'];
 
 test('--help lists every command', async () => {
   for (const flag of ['--help', '-h', 'help']) {

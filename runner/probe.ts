@@ -58,6 +58,7 @@ const ELEMENT_SAMPLE = 1000;
 const MAX_KEY_CHARS = 40;
 /** Only a number under a key like this is printed; every other number is just `number`. */
 const COUNT_KEY = /count|total|size|length|page/i;
+const GUID_KEY = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const TOKEN_SHAPED = new RegExp(JWT.source);
 
 const number = (n: number): string => n.toLocaleString('en-US');
@@ -66,8 +67,16 @@ const number = (n: number): string => n.toLocaleString('en-US');
 // shape
 // ---------------------------------------------------------------------------------------------------------------
 
+/** A key that is itself data (a map keyed by e-mail, id or date) is not printed: `<key>`. */
+function dataLikeKey(key: string): boolean {
+  if (key.includes('@') || GUID_KEY.test(key)) return true;
+  const digits = key.replace(/\D/g, '').length;
+  return key.length >= 3 && digits / key.length > 0.5;
+}
+
 function showKey(key: string): string {
   if (TOKEN_SHAPED.test(key)) return '<token-like key>';
+  if (dataLikeKey(key)) return '<key>';
   // eslint-disable-next-line no-control-regex
   const clean = key.replace(/[\u0000-\u001f\u007f]/g, '?');
   return clean.length > MAX_KEY_CHARS ? `${clean.slice(0, MAX_KEY_CHARS)}…` : clean;

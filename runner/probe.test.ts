@@ -89,6 +89,31 @@ test('describeShape: keys and types, numbers only under count/total/size/length/
   assert.ok(!lines.join('\n').includes('Alice'));
 });
 
+test('describeShape: a key that is data (e-mail, GUID, mostly digits) prints as <key>, ordinary keys stay', () => {
+  const lines = describeShape({
+    'jane.doe@example.test': { total: 3 },
+    '3f2c9a1e-5b7d-4e8a-9c01-0a1b2c3d4e5f': 'x',
+    '20261030': 1,
+    '4711-0815': true,
+    page2: 1,
+    item1: 'y',
+    id: 7,
+    totalCount: 9,
+  });
+  assert.deepEqual(lines, [
+    '<key>: number', // 20261030 (JavaScript lists integer-like keys first)
+    '<key>: object {total: 3}',
+    '<key>: string',
+    '<key>: boolean',
+    'page2: 1',
+    'item1: string',
+    'id: number',
+    'totalCount: 9',
+  ]);
+  const nested = describeShape({ byUser: { 'jane.doe@example.test': { n: 1 } } }, 3).join('\n');
+  assert.ok(!nested.includes('jane') && !nested.includes('example.test'), nested);
+});
+
 test('describeShape: a 50,000 element array is one line, not a dump', () => {
   const lines = describeShape(Array.from({ length: 50_000 }, (_, i) => ({ id: i, name: `Item ${i}` })));
   assert.equal(lines.length, 1);

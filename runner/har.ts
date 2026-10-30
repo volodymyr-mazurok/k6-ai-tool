@@ -156,3 +156,105 @@ export function summarizeHar(harPath: string, apiUrl: string): HarEntrySummary[]
   });
   return out;
 }
+
+// ---------------------------------------------------------------------------------------------------------------
+// authSummary: how the app signs its calls, as a shape
+// ---------------------------------------------------------------------------------------------------------------
+
+/** How the app authenticated its API calls. Describes a shape (scheme, header name, length/kind of the value); never holds a value. */
+export interface AuthSummary {
+  scheme: 'bearer' | 'token' | 'basic' | 'api-key-header' | 'cookie' | 'none';
+  /** The header that carried the credential (`Authorization`, `X-Api-Key`, `Cookie`); null for none. */
+  header: string | null;
+  /** What the value looked like, e.g. `JWT`, `16 letters and digits`, `2 cookies`. Never the value. */
+  valueShape: string;
+  /** POSTs to a token or login route, to any host, anywhere in the recording. */
+  tokenRequests: number;
+}
+
+interface AuthEntry {
+  request?: {
+    method?: string;
+    url?: string;
+    headers?: Array<{ name?: string; value?: string }>;
+    cookies?: unknown[];
+  };
+}
+
+/** Header names that carry an API key or token on their own (a CSRF token does not authenticate). */
+const API_KEY_HEADER = /^(x-)?api[-_]?(key|token)$|^ocp-apim-subscription-key$|^x-[\w-]*(key|token|auth)[\w-]*$/i;
+const CSRF_HEADER = /csrf|xsrf/i;
+/** A route that issues a token or signs in: …/token, …/login, …/signin, …/authenticate. */
+const TOKEN_ROUTE = /\/(token|login|sign-?in|authenticate)\/?$/i;
+
+/** `JWT`, or the length and kind of an opaque value. Never the value itself. */
+function valueShape(value: string): string {
+  if (JWT.test(value)) return 'JWT';
+  if (/^[A-Za-z0-9]+$/.test(value)) {
+    const letters = /[A-Za-z]/.test(value);
+    const digits = /\d/.test(value);
+    const kind = letters && digits ? 'letters and digits' : digits ? 'digits' : 'letters';
+    return `${value.length} ${kind}`;
+  }
+  return `${value.length} characters`;
+}
+
+function headerValue(entry: AuthEntry, wanted: (name: string) => boolean): { name: string; value: string } | undefined {
+  for (const h of entry.request?.headers ?? []) {
+    if (h.name && h.value !== undefined && wanted(h.name)) return { name: h.name, value: h.value };
+  }
+  return undefined;
+}
+
+function underApi(url: string | undefined, base: string): boolean {
+  if (!url || !url.startsWith(base)) return false;
+  const next = url.slice(base.length)[0];
+  return next === undefined || next === '/' || next === '?' || next === '#';
+}
+
+/**
+ * How the API calls in a HAR (every entry under `apiUrl`) were authenticated, from the first call that carries a credential:
+ * an Authorization header (bearer, token, basic), else an API-key style header, else cookies; `none` when there is none.
+ * Only the scheme, the header NAME and the shape of the value come out. The raw HAR holds the real values: delete it.
+ */
+export function authSummary(harPath: string, apiUrl: string): AuthSummary {
+  const har = JSON.parse(readFileSync(harPath, 'utf8')) as { log?: { entries?: AuthEntry[] } };
+  const entries = har.log?.entries;
+  if (!Array.isArray(entries)) throw new Error(`${harPath} is not a HAR (no log.entries)`);
+
+  const base = apiUrl.replace(/\/+$/, '');
+  const tokenRequests = entries.filter((e) => {
+    if ((e.request?.method ?? '').toUpperCase() !== 'POST') return false;
+    try {
+      return TOKEN_ROUTE.test(new URL(e.request?.url ?? '').pathname);
+    } catch {
+      return false;
+    }
+  }).length;
+  const none: AuthSummary = { scheme: 'none', header: null, valueShape: 'no credentials sent', tokenRequests };
+  const calls = entries.filter((e) => underApi(e.request?.url, base));
+
+  for (const call of calls) {
+    const auth = headerValue(call, (n) => n.toLowerCase() === 'authorization');
+    if (!auth) continue;
+    const parts = /^(\S+)\s+(\S.*)$/.exec(auth.value.trim());
+    const word = parts?.[1]?.toLowerCase();
+    const rest = (parts?.[2] ?? auth.value).trim();
+    if (word === 'bearer' || word === 'token') return { scheme: word, header: 'Authorization', valueShape: valueShape(rest), tokenRequests };
+    if (word === 'basic') {
+      const pair = Buffer.from(rest, 'base64').toString('utf8').includes(':');
+      return { scheme: 'basic', header: 'Authorization', valueShape: pair ? 'base64 user:password pair' : valueShape(rest), tokenRequests };
+    }
+    return { scheme: 'api-key-header', header: 'Authorization', valueShape: valueShape(rest), tokenRequests };
+  }
+  for (const call of calls) {
+    const key = headerValue(call, (n) => API_KEY_HEADER.test(n) && !CSRF_HEADER.test(n));
+    if (key) return { scheme: 'api-key-header', header: key.name, valueShape: valueShape(key.value.trim()), tokenRequests };
+  }
+  for (const call of calls) {
+    const cookie = headerValue(call, (n) => n.toLowerCase() === 'cookie');
+    const count = cookie ? cookie.value.split(';').filter((p) => p.trim() !== '').length : (call.request?.cookies?.length ?? 0);
+    if (count > 0) return { scheme: 'cookie', header: 'Cookie', valueShape: `${count} cookie${count === 1 ? '' : 's'}`, tokenRequests };
+  }
+  return none;
+}

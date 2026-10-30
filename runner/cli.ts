@@ -17,6 +17,7 @@ import { summarizeHar } from './har.js';
 import { referenceIds } from './knowledge.js';
 import { formatProbe, probe, ProbeRefusedError } from './probe.js';
 import { NotARunFolderError, renderRunReport, verifyRunReport } from './report/build.js';
+import { authPath, driveActions, parseActions, record } from './record.js';
 import { runFeature, RunInterruptedError } from './run.js';
 import type { Verdict } from './report/model.js';
 import { formatSelftest, runSelftest } from './selftest/selftest.js';
@@ -65,6 +66,16 @@ Commands:
       Write the scrubbed summary of a recorded HAR (method, path, status, ms, request body, response top-level keys of the
       calls under --api; no headers, cookies or tokens) as evidence for a journey. Delete the raw HAR afterwards. Exits 1 with
       a warning when no call is under --api (the url is probably wrong).
+  record <project> --env <env> --start <url> --out <recording.json> [--actions <file.json>]
+      Record a real browser session as evidence for a journey. A browser window opens at --start: drive the app, log in
+      yourself if asked, and close the window when done. Writes --out (the scrubbed har-summary JSON of the calls under the
+      env's api url) and the way the app signs in as a shape (scheme, header name, kind and length of the value; never the
+      value) next to it as <out minus .json>.auth.json. The raw HAR lives in a temp folder and is deleted in every case.
+      Exits 1 and writes nothing when no call under the env's api url was recorded (the api url is probably wrong).
+      --actions <file>    no window: headless, run a JSON list of actions, then close. Each element is one of
+                          {"goto":"<url>"}, {"click":"<selector>"}, {"fill":["<selector>","<text>"]}, {"wait":<ms>}.
+                          Unknown keys are refused (exit code 2); a goto may not leave --start's origin, --start must be on
+                          the env's app url, and a password field cannot be filled (log in with a window instead).
   baseline accept <runDir>
       Make a run the reference for its feature, env and profile: its per-step p50/p95/p99, error rate and req/s go to that slot
       of the feature's baseline.json (other slots stay; an earlier baseline of the slot is replaced). Refuses a smoke, FAIL or
@@ -343,6 +354,56 @@ function harSummaryCommand(args: string[]): number {
   return 0;
 }
 
+async function recordCommand(args: string[]): Promise<number> {
+  const { values, positionals } = parseArgs({
+    args,
+    allowPositionals: true,
+    options: { env: { type: 'string' }, start: { type: 'string' }, out: { type: 'string' }, actions: { type: 'string' } },
+  });
+  const [projectName, ...extra] = positionals;
+  if (!projectName || extra.length > 0) throw new UsageError('record needs <project>');
+  if (!values.env) throw new UsageError('record needs --env <env>');
+  if (!values.start) throw new UsageError('record needs --start <url>');
+  if (!values.out) throw new UsageError('record needs --out <recording.json>');
+  let start: URL;
+  try {
+    start = new URL(values.start);
+  } catch {
+    throw new UsageError(`--start ${JSON.stringify(values.start)} is not a url`);
+  }
+  if (!/^https?:$/.test(start.protocol)) throw new UsageError('--start must be an http(s) url');
+
+  const project = await loadProject(projectName);
+  const config = checkEnv(project, values.env);
+
+  let drive: ReturnType<typeof driveActions> | undefined;
+  if (values.actions !== undefined) {
+    // A headless session is driven by a list, so it may only visit the app of this env.
+    const allowed = [config.appUrl, config.apiUrl].flatMap((url) => (url ? [new URL(url).origin] : []));
+    if (!allowed.includes(start.origin)) {
+      throw new ConfigError(`--start ${start.origin} is not the app url or api url of env ${values.env}; a headless recording (--actions) stays on the env's app (allowed: ${allowed.join(', ')})`);
+    }
+    let json: unknown;
+    try {
+      json = JSON.parse(readFileSync(values.actions, 'utf8'));
+    } catch (err) {
+      throw new UsageError(`--actions ${values.actions}: ${(err as NodeJS.ErrnoException).code === 'ENOENT' ? 'cannot read the file' : 'cannot read the file or it is not valid JSON'}`);
+    }
+    drive = driveActions(parseActions(json, values.start));
+  }
+
+  const result = await record({ startUrl: values.start, apiUrl: config.apiUrl, out: values.out, headless: drive !== undefined, drive });
+  if (result.calls === 0) {
+    console.error(`perf: no API calls under ${config.apiUrl} were recorded — wrong --env api url, or the flow never reached the API`);
+    return 1;
+  }
+  const { auth } = result;
+  console.log(`perf: ${result.calls} API call${result.calls === 1 ? '' : 's'} recorded into ${values.out}`);
+  console.log(`perf: auth: ${auth.scheme}${auth.header ? ` (${auth.header})` : ''}, ${auth.valueShape}, ${auth.tokenRequests} token request${auth.tokenRequests === 1 ? '' : 's'} -> ${authPath(values.out)}`);
+  console.log('perf: the raw HAR was deleted; only the scrubbed summary and the auth shape were kept');
+  return 0;
+}
+
 /** Run the CLI with `argv` (without node and the script); returns the exit code. */
 export async function main(argv: string[]): Promise<number> {
   const [command, ...rest] = argv;
@@ -361,6 +422,7 @@ export async function main(argv: string[]): Promise<number> {
     if (command === 'baseline') return await baselineCommand(rest);
     if (command === 'compare') return await compareCommand(rest);
     if (command === 'har-summary') return harSummaryCommand(rest);
+    if (command === 'record') return await recordCommand(rest);
     if (command === 'selftest') return await selftestCommand(rest);
     throw new UsageError(`unknown command ${command}`);
   } catch (err) {
