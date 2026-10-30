@@ -19,7 +19,7 @@ the Claim is what that one source supports, in our own words.
 - Title: The Site Reliability Workbook, Chapter 2: Implementing SLOs (Google)
 - URL: https://sre.google/workbook/implementing-slos/
 - Read: 2026-10-30
-- Claim: A latency objective is the share of requests faster than a threshold; one number hides the long tail, so set two (for example most requests under one limit and nearly all under a looser one), and round the limits instead of copying today's measurements.
+- Claim: A latency objective is the share of requests faster than a threshold; one number hides the long tail, so set two (for example most requests under one limit and nearly all under a looser one), and round the limits down to manageable numbers.
 
 ## web-vitals
 - Title: Web Vitals (web.dev)
@@ -43,7 +43,7 @@ the Claim is what that one source supports, in our own words.
 - Title: Open and closed models (Grafana k6 documentation)
 - URL: https://grafana.com/docs/k6/latest/using-k6/scenarios/concepts/open-vs-closed/
 - Read: 2026-10-30
-- Claim: In a closed model a virtual user starts its next iteration only after the last one ends, so a slow system receives less load; in an open model (the arrival-rate executors) iterations start on a schedule whatever the response times are, and k6 uses the term coordinated omission for the closed model's habit of easing off just when the system struggles.
+- Claim: In a closed model a virtual user starts its next iteration only after the previous one ends, so a slow system receives less load; the arrival-rate executors form k6's open model, where iterations start on schedule whatever the response times are.
 
 ## coordinated-omission-scylladb
 - Title: On Coordinated Omission (ScyllaDB)
@@ -79,7 +79,7 @@ the Claim is what that one source supports, in our own words.
 - Title: Thresholds (Grafana k6 documentation)
 - URL: https://grafana.com/docs/k6/latest/using-k6/thresholds/
 - Read: 2026-10-30
-- Claim: A threshold is a pass/fail rule on a metric, for example p(95)<200 on http_req_duration; a crossed threshold makes k6 exit non-zero, and abortOnFail stops the run at once, with delayAbortEval holding the check back while data is sparse.
+- Claim: A threshold is a pass/fail rule on a metric, for example p(95)<200 on http_req_duration, and any crossed threshold makes k6 exit non-zero.
 
 ## k6-checks
 - Title: Checks (Grafana k6 documentation)
@@ -115,7 +115,7 @@ the Claim is what that one source supports, in our own words.
 - Title: Understand and resolve SQL Server blocking problems (Microsoft Learn)
 - URL: https://learn.microsoft.com/en-us/troubleshoot/sql/database-engine/performance/understand-resolve-blocking
 - Read: 2026-10-30
-- Claim: Some blocking is normal, but long-lasting blocking cuts throughput and causes timeouts; find the head blocker (the session at the front of the chain) and its statement, and fix the cause, usually long or open transactions, wide locks, or a query that needs tuning.
+- Claim: Some blocking is normal, but long-lasting blocking cuts throughput and causes timeouts; find the head blocker (the session at the front of the chain) and the statement it runs before choosing a fix.
 
 ## ms-missing-index-suggestions
 - Title: Tune nonclustered indexes with missing index suggestions (Microsoft Learn)

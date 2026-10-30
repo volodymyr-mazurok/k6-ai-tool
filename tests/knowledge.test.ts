@@ -38,7 +38,7 @@ test('every [ref:<id>] in metrics.md and bottlenecks.md resolves to a reference'
 
 test('metrics.md covers each metric the report shows', async () => {
   const text = (await read('metrics.md')).toLowerCase();
-  for (const term of ['p50', 'p95', 'p99', 'http_req_failed', 'checks', 'req/s', 'iterations', 'dropped iterations', 'db cpu', 'io']) {
+  for (const term of ['p50', 'p95', 'p99', 'http_req_failed', 'checks', 'req/s', 'iterations', 'dropped iterations', 'db cpu', 'data io']) {
     assert.ok(text.includes(term), `metrics.md does not mention ${term}`);
   }
 });

@@ -10,7 +10,7 @@ Files: `summary.json` (k6's totals per metric, per step by the `name` tag), `tim
 
 ## One step far slower than the rest, server side
 
-- **Shows as:** one `name:<journey>.<step>` row in `summary.json` with a high p95 whose time is almost all `http_req_waiting` [ref:k6-metrics-reference]; `http_req_blocked` and `http_req_connecting` are small, which in our experience rules out the load machine and the network.
+- **Shows as:** one `name:<journey>.<step>` row in `summary.json` with a high p95 while the other steps are fast. The run folder keeps per-step figures only for `http_req_duration`, `http_req_failed` and `checks`; the split into `http_req_waiting`, `http_req_blocked` and `http_req_connecting` exists only run-wide [ref:k6-metrics-reference]. A run-wide `http_req_waiting` close to the run-wide `http_req_duration`, with small blocked and connecting values, is a hint that time is spent on the server and not on the load machine or network (our experience, not proof). A per-step split is not in the run folder, so do not state which part of one step's time is waiting.
 - **Check next:** `db.json` `topStatements`: is there a statement with a large `elapsedUs` or `logicalReads` whose text matches what the step does?
 - **Usual fixes:** see the database patterns below if a statement stands out; otherwise profile the endpoint's own code (caching, work done per request, payload size).
 

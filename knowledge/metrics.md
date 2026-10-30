@@ -16,8 +16,8 @@ How to read each number `report.html` and `report.md` show. Where a source suppo
 
 ## Where the time goes: waiting, blocked, connecting
 
-- `http_req_waiting` is time to first byte: the server working before it answers. A slow query shows here [ref:k6-metrics-reference].
-- `http_req_blocked` (waiting for a free connection) and `http_req_connecting` (opening the connection) are connection costs [ref:k6-metrics-reference]. In our experience high values point at the load machine or the network, not the server. Keep the load generator well below saturation so it does not skew the result [ref:ms-load-testing-guidance].
+- `http_req_waiting` is time to first byte: the server working before it answers. A slow query shows here [ref:k6-metrics-reference]. These timings (waiting, blocked, connecting) are recorded run-wide only; the run folder has no per-step split, so they hint at where time goes overall and say nothing about one step.
+- `http_req_blocked` (waiting for a free connection) and `http_req_connecting` (opening the connection) are connection costs [ref:k6-metrics-reference]. In our experience high run-wide values point at the load machine or the network, not the server. Keep the load generator well below saturation so it does not skew the result [ref:ms-load-testing-guidance].
 
 ## Failures: http_req_failed and checks
 
@@ -57,5 +57,5 @@ DB CPU and DB IO are the two figures the report quotes from the database.
 
 ## Targets and scores
 
-- A latency objective is "share of requests under a limit" [ref:sre-workbook-slos]. Round limits instead of copying today's measurement, and do not set a target from one run.
+- A latency objective is "share of requests under a limit" [ref:sre-workbook-slos]. Round limits down to manageable numbers (the workbook's example is steps of 50 ms) instead of copying today's measurement, and do not set a target from one run.
 - An Apdex-style score collapses times into 0-1 against a target T [ref:apdex]. The report does not print one; if you compute one, state T, because the score moves with it.
