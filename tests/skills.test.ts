@@ -107,7 +107,7 @@ test('lint: each rule catches its own violation', () => {
 
 // --- the skills
 
-for (const name of ['perf-consult', 'perf-discover', 'perf-script']) {
+for (const name of ['perf-consult', 'perf-discover', 'perf-script', 'perf-run', 'perf-report']) {
   test(`the ${name} skill exists`, () => {
     assert.ok(existsSync(`${SKILLS}/${name}/SKILL.md`), `.claude/skills/${name}/SKILL.md is missing`);
   });
