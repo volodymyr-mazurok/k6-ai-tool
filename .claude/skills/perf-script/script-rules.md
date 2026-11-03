@@ -94,7 +94,10 @@ only when the route is in `read_only_post_routes`.
 | `perf:` says the row counts differ or could not be read | app or journey (a write nobody cleans up) | report; never touch `row_count_tables` |
 | Exit 2, a refusal (env lock, busy, unknown env) | guardrail | report the refusal as printed; no override flag (they are never yours to pass; only the owner can ask for one) |
 
-Same cause = the same step and the same failing check or error. Three failed smokes for one cause, then stop.
+Same cause = the same step and the same failing check or error. Three failed smokes for one cause, then stop. A
+failure that only changes its name (the same step failing for the same underlying reason, for example a parse error
+that becomes a failed check after an edit, or another check name on the same wrong body) is the same cause: the count
+does not restart.
 
 ## 4. The two report blocks
 

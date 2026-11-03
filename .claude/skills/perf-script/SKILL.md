@@ -6,8 +6,9 @@ description: Use when a reviewed journey.yaml needs its k6 script written or fix
 # perf-script
 
 Turns a **reviewed journey** into `<feature>.js` and runs it through the runner until its smoke is green. It reads
-`journey.yaml`, `workload.yaml`, `context.md`, `fixtures/` and `recordings/` of the feature, and writes only the script
-(and, when a body is missing, a fixture backed by evidence). It never edits `journey.yaml` or `project.yaml`, and it
+`journey.yaml`, `workload.yaml`, `context.md`, `fixtures/` and `recordings/` of the feature, and writes only the script,
+a fixture backed by evidence when a body is missing, and lines in the evidence log of `context.md` (which evidence each
+check rests on; nothing else in that file). It never edits `journey.yaml`, `workload.yaml` or `project.yaml`, and it
 never starts a load, stress or soak run.
 
 **Core rule: a check states what the evidence says the answer is.** A check changes only to match the evidence
@@ -43,7 +44,7 @@ because the app or the env answers wrongly stays red, and you report it.
    failure with one `npm run perf -- probe …` of that step's request before you call it anything.
    - **Script:** fix the script, toward the evidence, and go to step 3.
    - **App or env:** stop and report it with the block in section 4. The check stays exactly as it was.
-6. **Three strikes.** At most three failed smokes for the same cause. After the third, stop and report what you tried
+6. **Three strikes.** At most three failed smokes for the same cause (a failure that only changes its name is the same cause, `script-rules.md` section 3). After the third, stop and report what you tried
    and what each smoke showed; do not try a fourth idea.
 7. **Done** when the last smoke of these exact files is green: verdict line printed, every step's checks at 100%
    (`passes > 0`, `fails = 0`), no "does not match the journey" line, row counts equal, and
@@ -54,6 +55,7 @@ because the app or the env answers wrongly stays red, and you report it.
 
 - A content check deleted, renamed away, or replaced with `status 2xx`, `res.body.length > 0` or `true` on a step whose evidence shows a real body.
 - A check rewritten after reading what the app returned, with no recording, swagger or cited probe that says the same.
+- An owner expectation in `context.md` the owner did not say in chat in this session (paraphrased, inferred, "the owner would agree", or from another session).
 - `try`/`catch` around `step()`, a check that returns `true` when parsing fails, or a step skipped when it fails.
 - `journey.yaml`, `project.yaml` (`read_only_post_routes`, `row_count_tables`, caps, abort limits) or `workload.yaml` edited to make a smoke pass.
 - A request sent with `http.*` directly, a step id that is not `<key>.<step name>`, or a route in the script that `journey.yaml` does not name.
@@ -65,7 +67,7 @@ because the app or the env answers wrongly stays red, and you report it.
 | Thought | Reality |
 | --- | --- |
 | "The app returns `results`, not `items`; I'll check `results`." | Which one does the evidence show? The recording says `items` → the app changed or is broken: report it. No evidence either way → open question for the owner. |
-| "The check is too strict; 20 items was only on that env." | Then the evidence names the env it came from. Ask the owner what this env should hold; a bare non-empty check needs their yes and goes into `context.md`. |
+| "The check is too strict; 20 items was only on that env." | Keep the check and report. It may become looser only on the owner's own statement **in chat, in this session**, quoted verbatim with the date in the evidence log of `context.md`. You never write an owner expectation yourself, infer one, or reuse one from another session. The looser check still asserts the evidenced key and fields (`items` is an array whose entries have `id` and `name`), never only the status, a non-empty body or `true`. |
 | "One check is flaky, the others prove the step." | A failing check is a finding. Find whose failure it is; never drop it. |
 | "Green is the goal; I'll restore the check after the smoke." | A green smoke with a weaker check proves nothing and unlocks a load run for the weaker files. |
 | "Catching the error keeps the run going." | `step()` already counts a throwing check as failed. A catch only hides it. |
