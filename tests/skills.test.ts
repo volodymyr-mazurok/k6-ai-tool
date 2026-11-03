@@ -107,9 +107,11 @@ test('lint: each rule catches its own violation', () => {
 
 // --- the skills
 
-test('the perf-consult skill exists', () => {
-  assert.ok(existsSync(`${SKILLS}/perf-consult/SKILL.md`), '.claude/skills/perf-consult/SKILL.md is missing');
-});
+for (const name of ['perf-consult', 'perf-discover']) {
+  test(`the ${name} skill exists`, () => {
+    assert.ok(existsSync(`${SKILLS}/${name}/SKILL.md`), `.claude/skills/${name}/SKILL.md is missing`);
+  });
+}
 
 test('every skill has frontmatter: name = its folder, a "Use when" description of at most 1024 characters', () => {
   for (const skill of skills()) {
