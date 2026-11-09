@@ -491,8 +491,9 @@ The same steps by hand, for when the skills are not available (or to see what th
    login) is kept. Or drive the matching automated test with HAR recording, then
    `npm run perf -- har-summary <har> --api <api url> --out …` and delete the raw HAR.
 2. Write `journey.yaml` (the steps, each with its evidence) and `workload.yaml` (user mix, think time, profile sizes) in
-   `projects/<p>/features/<f>/`. Copy the self-test project's (`runner/selftest/project/features/items/`).
-3. Write `<f>.js` the way `items.js` is written: `step()` for every request, a content check in each.
+   `projects/<p>/features/<f>/`. Copy the template's example first (`projects/_template/features/example/`, every key
+   commented); the self-test project's (`runner/selftest/project/features/items/`) is a filled-in second reference.
+3. Write `<f>.js` the way `example.js` (or the self-test's `items.js`) is written: `step()` for every request, a content check in each.
 4. `npm run perf -- check <p> <f> --env <env>` until it says `0 problems`, then a smoke run until it is green.
 5. A load run inside the window, read the report, `baseline accept` if it is a good one.
 

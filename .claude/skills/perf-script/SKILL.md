@@ -23,10 +23,8 @@ because the app or the env answers wrongly stays red, and you report it.
 - A skill that gets a smoke green by weakening checks (deleting a content check, widening a status check to "any 2xx with any
   body", catching errors to hide them).
 - A skill that starts a load, stress or soak run on its own, passes `--override-window`, `--override-busy` or `--allow-max`, or proposes a size above the project's defaults without saying so and getting the owner's yes.
-- A consultant that quotes a benchmark without a citation, a number that is not in the run folder, or a "fix" with no
-  evidence behind it.
 - A skill that types a password, creates an account, or reads a path a project's README forbids.
-- Invented endpoints (AC P1 still holds: every step cites evidence).
+- A request the journey does not have, or an invented endpoint: every step comes from `journey.yaml` and its evidence.
 
 ## The flow
 

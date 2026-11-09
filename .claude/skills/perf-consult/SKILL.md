@@ -18,6 +18,9 @@ Your first reply starts with one line that offers the choice, then carries on wi
 
 > "Do you want guidance end to end (journey, script, smoke, sized run, report), or just this answer? I'll answer now; say *guided* to go end to end."
 
+Leave the line out when guided mode is already running, and when perf-report calls this skill for part 2 of
+`findings.md`: the person already chose.
+
 Then read `projects/<name>/README.md` (secret locations, forbidden paths) before opening anything else of that
 project. The self-test project lives in `runner/selftest/project/` instead of `projects/`.
 
@@ -41,7 +44,7 @@ everything" is the request, never a yes for a gate you have not shown yet.
 | --- | --- | --- |
 | 1. Journey and workload | perf-discover | Gate A (new project or new env only: its settings), then Gate B (the review block). An existing journey is shown at Gate B too; a review from another session is not this owner's yes |
 | 2. Script and smoke | perf-script | after the green smoke: its done block (or its report when the app or env is at fault, and the chain ends there) |
-| 3. Sizing | `sizing.md` | the proposal, or the one question for a missing business number; `workload.yaml` changes only after the yes |
+| 3. Sizing | `sizing.md` | the proposal, or the one question for a missing business number; `workload.yaml` changes only after the yes to the proposal (giving the numbers is not that yes) |
 | 4. Load go-ahead | perf-run | the dry run's go block; a refusal block ends the chain until the owner says what to do |
 | 5. Run | perf-run | none: the go was given; then its account (healthy, or the class and evidence) |
 | 6. Findings | perf-report | none: `findings.md` with `--verify-findings` passing |
@@ -55,8 +58,9 @@ both wait on the owner, ask them in two messages, sizing first: the dry run is o
   after the owner saw the dry run and said yes to it, in this session, for that run, even on the local mock.
 - **No gate is skipped**, also when it looks settled: a feature that already has a journey, a project whose smoke
   passed yesterday, a sizing the person half-gave in the first message. Show the gate; a quick yes costs one message.
-- **A stage that cannot finish ends the chain there**: an open question at Gate B, a red smoke after three strikes,
-  a refusal. Report it with that skill's block and the status line ("stopped: smoke red, app answers 500 on
+- **A stage that cannot finish ends the chain there**: an open question at Gate B that someone other than the owner
+  must answer (another team, a swagger nobody has), a red smoke after three strikes, a refusal. A question the owner
+  answers at the gate does not block: record the answer and carry on as `journey-rules.md` section 7 says. Report it with that skill's block and the status line ("stopped: smoke red, app answers 500 on
   `items.search`; next: the app's team"); never move on to the next stage around it.
 - When a pipeline skill is not installed, follow README section 10 by hand for that stage, with the same stops.
 
@@ -75,7 +79,7 @@ both wait on the owner, ask them in two messages, sizing first: the dry run is o
 | Thought | Reality |
 | --- | --- |
 | "The realistic size is the cap; the owner will surely say yes." | Then the owner says it. Propose the run within defaults, show the gap, stop. |
-| "The question had all the numbers, no need to offer guided mode." | The offer is one line and costs nothing. Always make it. |
+| "The question had all the numbers, no need to offer guided mode." | The offer is one line and costs nothing. Make it on every first reply, unless guided mode is already running or perf-report called you. |
 | "300 users per hour obviously means sessions started per hour." | Probably. Write it as an assumption, ask, and show what changes if it means concurrent users. |
 | "Reference comparison and evidence read better mixed." | Two parts, always: what the run shows, then references and suggestions. |
 | "This cause is clear from the numbers." | A run shows symptoms. Name it a lead, cite the evidence, give a confidence. |

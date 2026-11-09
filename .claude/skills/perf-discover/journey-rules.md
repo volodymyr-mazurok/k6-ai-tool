@@ -11,8 +11,10 @@ rules say what goes into them.
   is a proposal: say so in the brief and ask at Gate B.
 - **Name steps for what the user does** (`search`, `open_item`, `export`), not for the route. A repeated call with a
   different purpose is its own step (`list_open`, `list_search` both `POST /items/search`).
-- **`request:` is `METHOD /route` relative to the api url**, written as the swagger names it: a fixed id becomes the
-  swagger's `{param}` (`GET /items/{id}`). The script fills it at run time from an earlier step's response (say which
+- **`request:` is `METHOD /route` relative to the api url**, without the api url's own path: the swagger's
+  `POST /api/items/search` is `request: POST /items/search` when the api url ends in `/api` (`perf check` puts the
+  api url's path back in front before it looks the route up). Otherwise write it as the swagger names it: a fixed id
+  becomes the swagger's `{param}` (`GET /items/{id}`). The script fills it at run time from an earlier step's response (say which
   field) or from `fixtures/`. A recorded id is never the plan.
 - **`optional_share:`** only when the evidence shows the step happens in some sessions only (the owner's estimate is
   evidence; write it in the brief as theirs).
@@ -20,15 +22,19 @@ rules say what goes into them.
 
 ## 2. Evidence (every step, no exceptions)
 
-`evidence:` is a mapping; name the source so someone else can open it. One or more of:
+`evidence:` is a mapping; name the source so someone else can open it. One or more of (the swagger line quotes the
+swagger's own path, with the api base; `request:` and the probe use the route without it):
 
 ```yaml
-evidence: { swagger: "POST /api/items/search (ItemsSearch)", recording: "recordings/search.json #3", probe: "2026-11-03 200 POST /items/search" }
+- name: search
+  request: POST /items/search
+  evidence: { swagger: "POST /api/items/search (ItemsSearch)", recording: "recordings/search.json #3", probe: "2026-11-03 200 POST /items/search" }
 ```
 
 - The swagger route is required for every step (`perf check` refuses one it cannot find).
 - The flow (that a user really sends it, in that order) comes from a recording, an automated test, or the owner's answer.
-  When only the swagger and a sentence exist, add `flow: "owner to confirm at review"` and list it as an open question.
+  When only the swagger and a sentence exist, add `flow: "owner to confirm at review"` and list it as an open question
+  for the owner at Gate B (answered there, it does not block; section 7).
 - A spec, ticket or chat line is written in the brief, never as a step's only evidence.
 - **Spec and evidence disagree** (the spec names `/items/find`, the swagger has only `/items/search`): no step on the
   spec's route; the evidence log records both; an open question asks the owner which one is meant. A step on the
@@ -86,9 +92,15 @@ look-alike silently), `WRITE_IN_READ_ONLY` / `WRITE_NOT_DECLARED` (section 3). R
 - Reads and writes: <read-only, or each write and who cleans up; anything not testable yet>
 - Data volume: <counts and whether they are realistic>
 - Workload: mix <…>, think time <…>, load <users> users (defaults <vus> users / <rps> req/s); sizing <done | still to do>
-- Open questions: <numbered, each with what changes depending on the answer>
+- Open questions: <numbered, each with what changes depending on the answer, and who can answer it: you, or someone else (blocks the gate)>
 
 Is this the journey to test? Say yes, or what to change. Nothing is scripted or run until you say yes.
 ```
+
+**Open questions at the gate.** A question the owner answers in their reply (the flow order, which route is meant, an
+estimate) does not block: write the answer into the brief and the evidence log as theirs, and when it changes the
+journey, go back through sections 1–7 and show the gate again. A question only someone else can answer (another team,
+the app's developers about cleanup, a swagger nobody has) blocks: the journey is not reviewed, Gate B does not pass,
+and the feature waits for that answer.
 
 A change the owner asks for goes back through sections 1–7 and the gate is shown again.

@@ -45,13 +45,16 @@ Propose, for the env the person named:
 
 - **Load profile:** `users` ≤ `defaults.vus`, a think time that makes those users produce R (from the formula above),
   a ramp of roughly 5–15% of the run and a hold of at least five times the ramp [ref:k6-average-load-testing] (README:
-  ten minutes or more for a real feature), the total within `max_duration` and the load window.
+  ten minutes or more for a real feature), the total within `max_duration` and the load window. Leave about 30 s
+  beyond the planned length for k6's graceful ramp-down and stop (long think times stretch a run).
 - **Stress profile** (when the question is "where does it break"): arrival rate in steps, `start_rps` near R, `max_rps`
   ≤ `defaults.rps`, steps long enough to settle [ref:ms-load-testing-guidance].
 - **When L or R is above the defaults:** say so plainly, with both numbers ("the realistic peak is 20 users at once;
   this env's default is 10"). Propose the within-defaults run first; going higher is the owner's decision, not part of
   your plan. When the request rate fits the defaults and only L does not, 10 users with a shorter think time give the
   server the same req/s; say that this changes concurrency, not the rate.
+- **The owner's yes.** Business numbers the owner gave are the input, not a yes to what you computed from them. Show
+  the proposal and ask for the yes before `workload.yaml` changes.
 - Confirm the shape with `npm run perf -- run <project> <feature> --profile load --env <env> --dry-run` (sends nothing,
   writes nothing). The dry run prints users and the req/s ceiling, not your R; your R comes from the arithmetic.
 
@@ -64,6 +67,8 @@ Say it in the proposal, in one line each, when it applies:
   Note the row counts the steps run against when known.
 - **Public demo site:** other users, rate limits and a host you do not own; keep to its small caps.
 - **Peak far below the defaults:** a load run at the peak shows little; a stress run within the defaults shows headroom.
+  Not on a public demo site, where stress is not allowed (smoke and load only): there a load at the defaults is a
+  check that the framework and the script work, and it measures little about the app.
 
 ## 6. Write it down
 
@@ -71,6 +76,10 @@ Append a `## Sizing (YYYY-MM-DD)` section to the feature's `context.md`
 (`projects/<name>/features/<feature>/context.md`; for the self-test feature `runner/selftest/project/features/items/`,
 create the file when it is missing) with: the numbers as given, the assumptions, the arithmetic, the proposal, and
 what it leaves out. Change `workload.yaml` only after the owner says yes to the proposal.
+
+Changing `workload.yaml` after the green smoke changes the smoke key, so the next load, stress or soak runs a smoke
+first (the dry run says `smoke: runs first`). Say so with the proposal; where the env has a smoke budget, that smoke
+counts against it.
 
 ## Worked example (self-test feature `items`)
 
@@ -100,5 +109,5 @@ project settings in every case.
 | --- | --- | --- | --- |
 | Public demo site | 5 / 5 | 2 / 2 | `max_duration` 5 minutes; smoke and load only |
 | Shared dev or test env | 20 / 30 | 10 / 15 | a load window outside working hours; the busy check on when there is a database |
-| Local mock / your own machine | any size within the project's caps | any, within the caps | no load window; no busy check (nobody else's work to protect) |
+| Local mock / your own machine | start from the self-test's 20 / 30 | start from the self-test's 10 / 15 | no load window; no busy check (nobody else's work to protect) |
 | Dedicated performance env | ask the owner | ask the owner | you may suggest numbers; never fill them in |

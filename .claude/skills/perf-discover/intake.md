@@ -9,7 +9,7 @@ Several inputs may come at once; use all of them and say in the evidence log whi
 | A spec page (Confluence, Jira) | the Atlassian connector, when this session has it connected | ask the person to paste the page or export it as a file | what to look for: flows, roles, slow spots. Never a route by itself |
 | A spec file (PDF, Word, Markdown, text) | read it | ask for a text or PDF export | as above |
 | A link to the app or one of its pages | `npm run perf -- record <project> --env <env> --start <url> --out <feature folder>/recordings/<flow>.json`: a window opens, the **person** drives the flow and logs in, then closes it. With no login on the way, you may drive it yourself with `--actions <file.json>` (`goto`, `click`, `fill`, `wait`) | ask the person for a HAR exported from the browser's developer tools (then the HAR row) | the real calls, their order, bodies, statuses, and the sign-in shape (`<out minus .json>.auth.json`) |
-| A swagger / OpenAPI url or file | fetch it read-only (`curl -s <url> -o <temp file outside the repo>`, or read the file); list paths and methods (below) | ask for the file; without any swagger `perf check` cannot pass: an open question for the owner | which routes and methods exist, bodies and examples when it has them, `securitySchemes` |
+| A swagger / OpenAPI url or file | fetch it read-only (`curl -s <url> -o <temp file outside the repo>`, or read the file); list paths and methods (below) | ask for the file; without any swagger `perf check` cannot pass: an open question for the owner | which routes and methods exist, bodies and examples when it has them, `securitySchemes`. The env's `swagger_url` must be an http(s) url the check can fetch: the env's own swagger, or a pinned raw url of the app's own OpenAPI file (a fixed commit in its repo) once the owner confirms it matches the deployed build |
 | An endpoint list, a curl command, a Postman/Insomnia export | read the requests as given; drop every header value, token and cookie on sight | — | candidate routes; each confirmed against the swagger before it becomes a step |
 | A HAR file | `npm run perf -- har-summary <har> --api <api url> --out <feature folder>/recordings/<flow>.json` | — | as a recording. A HAR you made: delete it after summarising. A HAR the person owns: leave it, and tell them it holds their tokens and should be deleted |
 | An automated UI or API test in another repo | read that repo's rules first and honour its forbidden paths too, when reading and when running; with the person's OK, run it with HAR recording if it supports that, then `har-summary`; otherwise read its requests | read its requests only | as a recording when run; as candidate routes when only read |
@@ -23,15 +23,28 @@ node -e 'const s=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));
 ```
 
 A YAML swagger: read it instead. Delete the temp file when done. Fetching the swagger you were handed is allowed
-before Gate A (one read-only document someone gave you); probes and recordings wait for Gate A. A swagger that answers 401 or a login page is an
-open question (where the document lives without a login), not a reason to send a credential.
+before Gate A (one read-only document someone gave you); probes and recordings wait for Gate A. Nobody handed you a
+swagger url → ask the owner for it (one question; you may name the usual places, such as `/swagger/v1/swagger.json`,
+`/swagger/index.html`, `/openapi.json`, `/v3/api-docs`); never try those paths against the env yourself before Gate A.
+A swagger that answers 401 or a login page is an open question (where the document lives without a login), not a
+reason to send a credential.
 
 **Probing** (after Gate A on a new project): `npm run perf -- probe <project> GET <path> --env <env>` sends one
-request with the project's own auth and prints a status line and a shape, never a body, a header or a token. Exit 0
-means the API answered, **whatever the status**: read the status line. 401/403: the auth settings or the role (it says
-which to check); 404: the route is not there; 5xx: the env, note it and move on. A POST is probed only when its route is
-in `read_only_post_routes` (or a declared write with `--feature`), with a body file from evidence (`--body <file.json>`).
-A probe is one request, not load; still, keep them few on a shared env and never loop them.
+request with the project's own auth and prints a status line and a shape, never a body, a header or a token. Exit 1
+means no API request was answered: a failed token request (the logins in `.env`, the token url, the role) or no answer
+at all. Exit 0 means the API answered, **whatever the status**: read the status line. 401/403 is still exit 0 and only
+prints a `hint:` line (which auth setting or role to check); 404: the route is not there; 5xx: the env, note it and
+move on. A probe is one request, not load; still, keep them few on a shared env and never loop them.
+
+**A POST probe.** A POST is probed only when its route is in `read_only_post_routes`, with a body file from evidence
+(`--body <file.json>`). A POST that is not listed yet: first ask the owner the one question "does `POST <route>` only
+read (no row created or changed)?", with your reason (swagger summary, recording); after their yes, add the route to
+`read_only_post_routes` and then probe it. Never probe it first to find out.
+
+**Probing a declared write** (`--feature <feature>` with the step under `writes:`) needs the owner's yes in chat for
+that one request, asked in its own message: say that it creates or changes a real row on `<env>` that the app must
+prune itself (its `cleanup: app`), and that nothing in this framework removes it. No yes → no probe; the step's evidence
+comes from the swagger or a recording instead.
 
 ## 2. The feature brief (top of `context.md`)
 
@@ -61,6 +74,15 @@ Then the evidence log and the data volume notes; the template's own `context.md`
 <the counts and array lengths the probes or recordings showed, and whether they are realistic>
 ```
 
+**Who writes what in `context.md`.** Each skill touches only its own parts; nobody rewrites another's lines.
+
+| Part | Written by | How |
+| --- | --- | --- |
+| Feature brief, evidence log, data volume | perf-discover | writes and updates them |
+| Evidence log lines on what each check rests on | perf-script | appends lines; changes nothing else |
+| `## Sizing (YYYY-MM-DD)` | perf-consult | appends a new section per sizing; an older one stays |
+| The template's "Last smoke / baseline" line | perf-run | updates it after each run (date, run folder, verdict); a baseline only after the owner's `baseline accept` |
+
 The evidence log holds what a command printed (status, time, shape) and what a document said; never a token, a
 password, a header value, a person's name or e-mail from a body. An auth kind other than `ropc` or `static_header`
 (another OAuth flow, signed requests, a cookie-only session) is not built in: write it in the brief and report the
@@ -82,6 +104,8 @@ feature as not testable yet.
    confirmed. Keep the template's `abort` limits unless the owner gives others. The template's `roles` become the real
    roles.
 5. A new env on an **existing** project is proposed the same way (urls, caps, defaults, window, busy check) and needs
-   the owner's yes to its settings before any probe or recording against it.
+   the owner's yes to its settings before any probe or recording against it. Changing a setting the owner already
+   approved (the swagger url, the confirmed auth, the api base, the caps, defaults or window) goes back through Gate A:
+   propose the change with its reason and wait for the yes before writing it.
 6. Secrets: the person puts logins and the token url in `.env` themselves (names in `.env.example`); you never see or
    type them. Then `npm run perf -- doctor <name> --env <env>` checks access before the first probe.

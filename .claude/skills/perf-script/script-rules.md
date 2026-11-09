@@ -1,7 +1,7 @@
 # Script rules: `<feature>.js`, reading a smoke, whose failure it is
 
-The two scripts to copy from are `projects/_template/features/example/example.js` (a project under `projects/`) and
-`runner/selftest/project/features/items/items.js` (the self-test project). The helpers are `core/request.js`
+Copy `projects/_template/features/example/example.js` first: it is the example for a project under `projects/`. The
+self-test's `runner/selftest/project/features/items/items.js` is the second reference (for the self-test project). The helpers are `core/request.js`
 (`step()`, `think()`, `shouldRun()`), `core/config.js` (`loadRunConfig()`, `loadSecrets()`, `buildOptions()`),
 `core/auth/ropc.js` (`fetchTokens()`, `bearer()`) and `core/auth/static.js` (`staticHeaders()`).
 

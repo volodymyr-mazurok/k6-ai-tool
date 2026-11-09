@@ -38,7 +38,8 @@ suggest `--override-window`, `--override-busy` or `--allow-max`, and never pass 
    **Unhealthy** (FAIL, INVALID, a refusal, an interrupt): classify it with the table below, naming the file and field
    that shows it, and what would fix it. When several classes show, name the verdict's own class first (INVALID
    outranks FAIL), then the others, each with its evidence.
-7. **Done:** a run folder with a report, and the one-paragraph account below.
+7. **Done:** a run folder with a report, and the one-paragraph account below. Update the "Last smoke / baseline" line
+   of the feature's `context.md` (date, run folder, verdict); that line is the only part of the file perf-run writes.
 
 ## Refusals: what each means and what you say
 
@@ -56,9 +57,10 @@ suggest `--override-window`, `--override-busy` or `--allow-max`, and never pass 
 **The next allowed start.** The window is `HH:MM-HH:MM` UTC on weekdays plus `weekends: all-day` or not. A window that
 runs past midnight belongs to the weekday it began on (Monday 02:00 is the tail of Sunday's night, so it follows the
 weekend rule). Take the next moment, from now, where the window holds; the run must also end inside it, so the latest
-start of that stretch is its end minus the dry run's `duration`. Example: window `17:00-06:00` on weekdays, all day on
-weekends, now Tue 13:01 UTC, a load of `1 min 25 s` → "next allowed start Tue 17:00 UTC; the latest start that night is
-about 05:58 UTC". State it in UTC, as the window is.
+start of that stretch is its end minus the dry run's `duration` and about 30 s more: k6 gives running iterations a
+graceful ramp-down and stop, and long think times stretch the run past its planned length. Example: window
+`17:00-06:00` on weekdays, all day on weekends, now Tue 13:01 UTC, a load of `1 min 25 s` → "next allowed start Tue
+17:00 UTC; the latest start that night is about 05:58 UTC". State it in UTC, as the window is.
 
 ## Unhealthy runs: whose problem it is
 

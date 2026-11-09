@@ -64,7 +64,8 @@ against a baseline of 403 ms[[int|meta.json#baseline.steps["items.slow_search"].
 - **The unit is not checked; convert in the expression.** Seconds from a millisecond source: `0.7 s[[dec2|… / 1000]]`.
   `pct` takes a fraction (0.012 → `1.2%`), `pctPoints` a value already in percent.
 - **Only number tokens are checked**, so a digit-led word fails as an uncited number: put `5xx`, `10-minute`, `2nd` in
-  backticks, or write it in words.
+  backticks, or write it in words. The same for a counter in prose: "part 1", "step 2", "top 3" fail; write "part
+  one", "the second step", "the top three", or `part 1` in backticks.
 - **A reference point's own numbers are not in the run folder.** Write them in words ("about one second
   [ref:nielsen-response-times]") or in backticks.
 - **No bold between the number and `[[`.** `**704**[[…]]` fails; bold the whole thing (`**704 ms[[…]]**`) or the label.

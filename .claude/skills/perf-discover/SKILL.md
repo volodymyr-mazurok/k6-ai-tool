@@ -26,7 +26,7 @@ open question.
 3. **New project** (only when none exists): propose it from `projects/_template/` as `intake.md` says, caps and defaults
    from the table in `.claude/skills/perf-consult/sizing.md`. **Gate A**: the owner approves the project settings.
    No probe and no recording against the env before that yes (fetching a swagger you were handed is fine). A new env
-   on an existing project goes through the same gate.
+   on an existing project goes through the same gate, and so does a change to a setting already approved there.
 4. **Fill the gaps** with the cheapest honest step, one at a time: read what was given → fetch the swagger → one
    `npm run perf -- probe …` → one question to the person. One question per message. Every answer goes into the evidence
    log; every unanswered gap stays an open question.
@@ -36,7 +36,8 @@ open question.
 6. **Check:** `npm run perf -- check <project> <feature> --env <env>` until it prints `0 problems`. Fix `journey.yaml`
    from evidence; never add a step or an evidence line to silence it.
 7. **Gate B**: show the owner the review block in `journey-rules.md` and stop. Done when the check says `0 problems`
-   **and** the owner said yes. Hand over to perf-script.
+   **and** the owner said yes. An open question the owner answers there does not block; one only someone else can
+   answer does (`journey-rules.md` section 7). Hand over to perf-script.
 
 ## Red flags: stop
 
@@ -44,6 +45,10 @@ open question.
 - A spec route quietly renamed to the swagger's nearest match. Log the disagreement and ask; do not decide for the owner.
 - An `evidence:` that says "spec", "assumed", "typical", "CHANGE" or names a source you did not open.
 - A probe or recording before Gate A on a new project or a new env, or a POST probed that is not in `read_only_post_routes`.
+- A declared write probed (`--feature`) without the owner's yes in chat for that request, or without telling them it
+  leaves a real row on the env that the app must prune itself.
+- A setting the owner approved at Gate A (swagger url, auth, api base, caps, defaults, window) changed without going
+  back through Gate A, or swagger locations tried against the env before Gate A instead of asking the owner.
 - Two questions in one message, or a gap filled with a plausible value instead of an open question.
 - A writing step with no one to clean up its rows kept in the journey, or `cleanup: app` written without the app's owner saying it prunes them.
 - Typing a password, asking for one in chat, or creating an account. The person logs in in the browser; logins go into `.env` by their own hand.
