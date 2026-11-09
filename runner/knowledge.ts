@@ -4,6 +4,7 @@
 
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import { REPO_ROOT } from './config.js';
 
 export interface Reference {
   id: string;
@@ -60,12 +61,12 @@ export function parseReferences(text: string): Reference[] {
   return refs;
 }
 
-/** The references of `<root>/knowledge/references.md` (root defaults to the current directory). */
-export async function loadReferences(root: string = process.cwd()): Promise<Reference[]> {
+/** The references of `<root>/knowledge/references.md` (root defaults to the repo root, whatever the current directory). */
+export async function loadReferences(root: string = REPO_ROOT): Promise<Reference[]> {
   return parseReferences(await readFile(join(root, 'knowledge', 'references.md'), 'utf8'));
 }
 
 /** The ids a `[ref:<id>]` citation may name. */
-export async function referenceIds(root: string = process.cwd()): Promise<Set<string>> {
+export async function referenceIds(root: string = REPO_ROOT): Promise<Set<string>> {
   return new Set((await loadReferences(root)).map((r) => r.id));
 }

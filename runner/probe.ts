@@ -56,8 +56,11 @@ const MAX_READ_BYTES = 32 * 1024 * 1024;
 /** How many elements of an array are looked at to name its element type. */
 const ELEMENT_SAMPLE = 1000;
 const MAX_KEY_CHARS = 40;
-/** Only a number under a key like this is printed; every other number is just `number`. */
-const COUNT_KEY = /count|total|size|length|page/i;
+/**
+ * Only a number under a count, size, length or page-number key is printed (totalCount, pageSize, length, pageNumber,
+ * currentPage, totalPages); every other number is just `number`. A bare `total*` is left out: totalSalary or totalPrice is data.
+ */
+const COUNT_KEY = /count|size|length|^(current)?page(s|number|no|index)?$|^totalpages$/i;
 const GUID_KEY = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const TOKEN_SHAPED = new RegExp(JWT.source);
 

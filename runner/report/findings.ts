@@ -155,8 +155,11 @@ const HEADING = /^#{1,6}\s/;
 const RUN_LINE = /^[\s*_]*Run:/;
 const LEADING = /^[[("'*_~≈<>≥≤={:]+/;
 const TRAILING = /[.,;:!?)\]"'*_}]+$/;
-/** A token that is a number: an optional sign, then a digit. Words like p95, k6, S1 or UTF-8 start with a letter and are not. */
-const NUMBER_TOKEN = /^[+-]?\d/;
+/**
+ * A token that is a number: an optional sign (+, - or the Unicode minus −), then a digit. Words like p95, k6, S1 or UTF-8
+ * start with a letter and are not.
+ */
+const NUMBER_TOKEN = /^[+\-\u2212]?\d/;
 /** What a `Run:` line may hold without a citation: a date (with a run id's time after it) or a time of day. */
 const DATE_OR_TIME = /^(\d{4}-\d{2}-\d{2}([T_]\S*)?|\d{1,2}:\d{2}(:\d{2})?(\.\d+)?Z?)$/;
 

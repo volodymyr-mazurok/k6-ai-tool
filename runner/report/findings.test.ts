@@ -77,6 +77,7 @@ test('a number with no citation fails and the problem names the token and the li
   assert.deepEqual(lint('About 12% of requests failed.'), ['uncited number "12%" in line 1']);
   assert.deepEqual(lint('Latency (433 ms) was high, 1,446 requests.'), ['uncited number "433" in line 1', 'uncited number "1,446" in line 1']);
   assert.deepEqual(lint('It rose +26%, then fell -80.'), ['uncited number "+26%" in line 1', 'uncited number "-80" in line 1']);
+  assert.deepEqual(lint('It fell −12% overnight.'), ['uncited number "−12%" in line 1'], 'a Unicode minus is a sign too');
 });
 
 test('numbers in inline code, code blocks and headings pass', () => {

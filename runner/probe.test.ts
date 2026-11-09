@@ -77,7 +77,7 @@ async function cli(...argv: string[]): Promise<{ code: number; out: string; err:
 // describeShape
 // ---------------------------------------------------------------------------------------------------------------
 
-test('describeShape: keys and types, numbers only under count/total/size/length/page keys, never a string', () => {
+test('describeShape: keys and types, numbers only under count/size/length/page-number keys, never a string', () => {
   const lines = describeShape({
     data: { entities: Array.from({ length: 10 }, (_, i) => ({ id: i })), totalCount: 1000, name: 'Alice Secret', age: 41, ok: true, none: null },
     pageSize: 25,
@@ -102,16 +102,51 @@ test('describeShape: a key that is data (e-mail, GUID, mostly digits) prints as 
   });
   assert.deepEqual(lines, [
     '<key>: number', // 20261030 (JavaScript lists integer-like keys first)
-    '<key>: object {total: 3}',
+    '<key>: object {total: number}',
     '<key>: string',
     '<key>: boolean',
-    'page2: 1',
+    'page2: number',
     'item1: string',
     'id: number',
     'totalCount: 9',
   ]);
   const nested = describeShape({ byUser: { 'jane.doe@example.test': { n: 1 } } }, 3).join('\n');
   assert.ok(!nested.includes('jane') && !nested.includes('example.test'), nested);
+});
+
+test('describeShape: a total that is money stays a number type; counts, sizes, lengths and page numbers print', () => {
+  const lines = describeShape({
+    totalSalary: 52000,
+    totalPrice: 19.99,
+    total: 7,
+    totalCount: 1000,
+    itemCount: 3,
+    pageSize: 20,
+    length: 4,
+    page: 2,
+    pageNumber: 2,
+    pageIndex: 1,
+    currentPage: 2,
+    totalPages: 50,
+    salary: 1,
+  });
+  assert.deepEqual(lines, [
+    'totalSalary: number',
+    'totalPrice: number',
+    'total: number',
+    'totalCount: 1000',
+    'itemCount: 3',
+    'pageSize: 20',
+    'length: 4',
+    'page: 2',
+    'pageNumber: 2',
+    'pageIndex: 1',
+    'currentPage: 2',
+    'totalPages: 50',
+    'salary: number',
+  ]);
+  const text = lines.join('\n');
+  assert.ok(!text.includes('52000') && !text.includes('19.99'), text);
 });
 
 test('describeShape: a 50,000 element array is one line, not a dump', () => {

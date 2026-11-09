@@ -51,7 +51,7 @@ Commands:
       Remove the standing test data the setup created (only rows the project's own naming marks as its own).
   probe <project> <METHOD> <path> --env <env> [--feature <feature>] [--body <file.json>] [--role <role>]
       Send ONE authenticated request to the env's API and print what came back: status, time, content type, size and the shape
-      of a JSON answer (keys, types, array lengths; a number's value only under a count-like key; never a string). Never prints
+      of a JSON answer (keys, types, array lengths; a number's value only under a count, size, length or page-number key; never a string). Never prints
       a token, a password or a header. <path> may leave out the API base's own path. Sends a GET; a POST only to a route in the
       project's read_only_post_routes; any other request only when --feature declares it in writes: (else exit code 2,
       PROBE_REFUSED, nothing sent). --role picks the account (default: the project's first role). 30 s timeout. Exits 0 when the
@@ -64,7 +64,7 @@ Commands:
       and no number stands uncited. Prints "findings: N numbers traced, M references", or the problems (exit code 1).
   har-summary <har> --api <url> --out <json>
       Write the scrubbed summary of a recorded HAR (method, path, status, ms, request body, response top-level keys of the
-      calls under --api; no headers, cookies or tokens) as evidence for a journey. Delete the raw HAR afterwards. Exits 1 with
+      calls under --api; no headers, cookies, tokens or login identities such as user names and e-mail addresses) as evidence for a journey. Delete the raw HAR afterwards. Exits 1 with
       a warning when no call is under --api (the url is probably wrong).
   record <project> --env <env> --start <url> --out <recording.json> [--actions <file.json>]
       Record a real browser session as evidence for a journey. A browser window opens at --start: drive the app, log in
@@ -75,8 +75,9 @@ Commands:
       --actions <file>    no window: headless, run a JSON list of actions, then close. Each element is one of
                           {"goto":"<url>"}, {"click":"<selector>"}, {"fill":["<selector>","<text>"]}, {"wait":<ms>}.
                           Unknown keys are refused (exit code 2); the session may not leave --start's origin (goto, click
-                          or redirect; refused, exit code 2), --start must be on the env's app url, and nothing is filled on a
-                          page with a password field or into a password-like field (log in with a window instead).
+                          or redirect; refused, exit code 2), --start must be on the origin of the env's app url or api url,
+                          and nothing is filled on a page with a password field or into a password-like field (log in with
+                          a window instead).
   baseline accept <runDir>
       Make a run the reference for its feature, env and profile: its per-step p50/p95/p99, error rate and req/s go to that slot
       of the feature's baseline.json (other slots stay; an earlier baseline of the slot is replaced). Refuses a smoke, FAIL or

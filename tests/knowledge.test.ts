@@ -87,3 +87,16 @@ test('loadReferences reads from a given root', async () => {
     await rm(root, { recursive: true, force: true });
   }
 });
+
+test('loadReferences and referenceIds default to the repo root, not the current directory', async () => {
+  const elsewhere = await mkdtemp(join(tmpdir(), 'perf-knowledge-cwd-'));
+  const before = process.cwd();
+  try {
+    process.chdir(elsewhere);
+    assert.ok((await loadReferences()).length >= 12, 'the repo references load from any working directory');
+    assert.ok((await referenceIds()).size >= 12);
+  } finally {
+    process.chdir(before);
+    await rm(elsewhere, { recursive: true, force: true });
+  }
+});

@@ -349,3 +349,38 @@ test('authSummary rejects a file that is not a HAR', async () => {
     await rm(dir, { recursive: true, force: true });
   }
 });
+
+test('summarizeHar drops login identities: a login POST keeps neither the user name nor the e-mail', async () => {
+  await withHar(
+    [
+      entry({
+        url: `${API}/account/login`,
+        method: 'POST',
+        postText: JSON.stringify({
+          username: 'jane.doe',
+          UserName: 'jdoe',
+          user: 'jd',
+          Email: 'jane.doe@example.test',
+          'e-mail': 'jd@example.test',
+          login: 'jdoe2',
+          phoneNumber: '+44 20 7946 0000',
+          rememberMe: true,
+          userId: GUID,
+        }),
+      }),
+      entry({
+        url: `${API}/search?q=jane.doe%40example.test&contact=${encodeURIComponent('Jane <j.doe+x@mail.example.test>')}&page=1`,
+        method: 'POST',
+        postText: JSON.stringify({ Search: 'mail jane.doe@example.test today', list: ['x.y@example.test', 'ok'] }),
+      }),
+    ],
+    (harPath) => {
+      const out = summarizeHar(harPath, API);
+      assert.deepEqual(out[0]!.requestBody, { rememberMe: true, userId: GUID });
+      assert.deepEqual(out[1]!.requestBody, { Search: 'mail [redacted] today', list: ['[redacted]', 'ok'] });
+      assert.equal(out[1]!.path, '/search?q=[redacted]&contact=[redacted]&page=1');
+      const text = JSON.stringify(out);
+      for (const secret of ['jane.doe', 'jdoe', '"jd"', 'example.test', '7946', '@']) assert.ok(!text.includes(secret), `output must not contain ${secret}`);
+    },
+  );
+});

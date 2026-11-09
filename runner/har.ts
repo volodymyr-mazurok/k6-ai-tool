@@ -2,7 +2,8 @@
 // whole static assets, so it never enters this repo; a summary keeps only what a journey is written from: method, path,
 // status, time, the request body and the top-level keys of the response.
 // Headers and cookies are never read: only the fields below are picked out of an entry. Credential-looking query
-// parameters, body fields, JWTs and long opaque tokens are redacted on top of that (tests/recordings.test.ts gates the
+// parameters, body fields, login identities (user name, e-mail, login, phone), e-mail addresses, JWTs and long opaque
+// tokens are redacted on top of that (tests/recordings.test.ts gates the
 // committed summaries). Delete the raw HAR once it is summarised: it holds the login traffic.
 
 import { readFileSync } from 'node:fs';
@@ -28,18 +29,27 @@ interface HarEntry {
   response?: { status?: number; content?: { text?: string; encoding?: string } };
 }
 
-/** Names (body keys, query parameters) whose values are credentials. Deliberately broad: over-dropping a field costs little. */
+/**
+ * Names (body keys, query parameters) whose values are credentials or a person's login identity (user name, e-mail, login,
+ * phone). Deliberately broad: over-dropping a field costs little. `userId` and the like are identifiers and stay.
+ */
 const SENSITIVE_NAME =
-  /pass|pwd|token|secret|authori[sz]ation|cookie|bearer|api[-_]?key|jwt|otp|code|credential|signature|session|^(sig|key|auth|sas)$/i;
+  /pass|pwd|token|secret|authori[sz]ation|cookie|bearer|api[-_]?key|jwt|otp|code|credential|signature|session|^(sig|key|auth|sas|user)$|user[-_]?name|e-?mail|login|phone/i;
+/** An e-mail address anywhere in a string. */
+const EMAIL = /[\w.+-]+@[\w-]+(\.[\w-]+)+/g;
 const JWT = /^eyJ[\w-]+\.[\w-]+\.[\w-]*$/;
 const GUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 /** 40+ characters of base64/hex/url-safe alphabet with no spaces. */
 const OPAQUE = /^[A-Za-z0-9_+/=.-]{40,}$/;
 const REDACTED = '[redacted]';
 
-/** A JWT, or a long opaque string with letters and digits (a token or session id). A GUID is an identifier, not a secret. */
+/**
+ * A JWT, a long opaque string with letters and digits (a token or session id), or a value holding an e-mail address.
+ * A GUID is an identifier, not a secret.
+ */
 function looksSecret(value: string): boolean {
   if (JWT.test(value)) return true;
+  if (new RegExp(EMAIL.source).test(value)) return true;
   return !GUID.test(value) && OPAQUE.test(value) && /[A-Za-z]/.test(value) && /\d/.test(value);
 }
 
@@ -51,10 +61,14 @@ function decode(text: string): string {
   }
 }
 
-/** Request-body value: credential-named keys are dropped, secret-looking strings replaced. */
+/** Request-body value: credential- and identity-named keys are dropped, secret-looking strings replaced, e-mail addresses inside a string redacted. */
 function scrub(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(scrub);
-  if (typeof value === 'string') return looksSecret(value) ? REDACTED : value;
+  if (typeof value === 'string') {
+    const withoutEmail = value.replace(EMAIL, REDACTED);
+    if (withoutEmail !== value) return withoutEmail.trim() === REDACTED ? REDACTED : withoutEmail;
+    return looksSecret(value) ? REDACTED : value;
+  }
   if (value && typeof value === 'object') {
     const clean: Record<string, unknown> = {};
     for (const [key, inner] of Object.entries(value)) {
