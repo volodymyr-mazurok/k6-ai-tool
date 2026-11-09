@@ -12,7 +12,7 @@ Several inputs may come at once; use all of them and say in the evidence log whi
 | A swagger / OpenAPI url or file | fetch it read-only (`curl -s <url> -o <temp file outside the repo>`, or read the file); list paths and methods (below) | ask for the file; without any swagger `perf check` cannot pass: an open question for the owner | which routes and methods exist, bodies and examples when it has them, `securitySchemes` |
 | An endpoint list, a curl command, a Postman/Insomnia export | read the requests as given; drop every header value, token and cookie on sight | — | candidate routes; each confirmed against the swagger before it becomes a step |
 | A HAR file | `npm run perf -- har-summary <har> --api <api url> --out <feature folder>/recordings/<flow>.json` | — | as a recording. A HAR you made: delete it after summarising. A HAR the person owns: leave it, and tell them it holds their tokens and should be deleted |
-| An automated UI or API test in another repo | read that repo's rules first; with the person's OK, run it with HAR recording if it supports that, then `har-summary`; otherwise read its requests | read its requests only | as a recording when run; as candidate routes when only read |
+| An automated UI or API test in another repo | read that repo's rules first and honour its forbidden paths too, when reading and when running; with the person's OK, run it with HAR recording if it supports that, then `har-summary`; otherwise read its requests | read its requests only | as a recording when run; as candidate routes when only read |
 | A sentence ("the item search is slow") | turn it into questions and a probe plan: which page, which role, which action, what "slow" means | — | where to look; nothing more |
 | An existing project or feature name | read its `projects/<name>/README.md`, then the feature's files; continue from the first missing piece (brief → evidence → journey → workload → check → gate) | — | what was already found; re-check anything older than the env's last deploy if the person says it changed |
 
@@ -22,7 +22,8 @@ Several inputs may come at once; use all of them and say in the evidence log whi
 node -e 'const s=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));for(const[p,o]of Object.entries(s.paths))for(const m of Object.keys(o))if(/^(get|post|put|patch|delete)$/.test(m))console.log(m.toUpperCase(),p,o[m].operationId??"")' <swagger.json>
 ```
 
-A YAML swagger: read it instead. Delete the temp file when done. A swagger that answers 401 or a login page is an
+A YAML swagger: read it instead. Delete the temp file when done. Fetching the swagger you were handed is allowed
+before Gate A (one read-only document someone gave you); probes and recordings wait for Gate A. A swagger that answers 401 or a login page is an
 open question (where the document lives without a login), not a reason to send a credential.
 
 **Probing** (after Gate A on a new project): `npm run perf -- probe <project> GET <path> --env <env>` sends one
@@ -70,7 +71,8 @@ feature as not testable yet.
 1. Propose, in one message: the folder name (letters, digits, `_`, `-`; not `selftest`), the env name(s) with app url,
    api url and swagger url, the auth kind and roles, and the caps, defaults and load window from the target's nature
    (the table in `.claude/skills/perf-consult/sizing.md`: public demo site, shared dev or test env, dedicated performance
-   env, for which you ask). A local mock on this machine may take the shared dev row. Say which row you used and why.
+   env, for which you ask; a local mock or your own machine has its own row), and the busy check on or off (on when
+   the adapter gives a database `db()`, off without one). Say which row you used and why.
 2. **Gate A:** "These are the project settings I propose. Nothing runs against `<env>` until you approve them; say yes,
    or what to change." Stop.
 3. After the yes: `cp -R projects/_template projects/<name>`; set `name:` in its `project.yaml`; fill every `CHANGE`
@@ -79,5 +81,7 @@ feature as not testable yet.
 4. Clear the template's `read_only_post_routes` and list only POST routes the evidence shows to read **and** the owner
    confirmed. Keep the template's `abort` limits unless the owner gives others. The template's `roles` become the real
    roles.
-5. Secrets: the person puts logins and the token url in `.env` themselves (names in `.env.example`); you never see or
+5. A new env on an **existing** project is proposed the same way (urls, caps, defaults, window, busy check) and needs
+   the owner's yes to its settings before any probe or recording against it.
+6. Secrets: the person puts logins and the token url in `.env` themselves (names in `.env.example`); you never see or
    type them. Then `npm run perf -- doctor <name> --env <env>` checks access before the first probe.

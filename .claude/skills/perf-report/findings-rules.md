@@ -20,7 +20,7 @@ What to cover, where each comes from:
 | --- | --- |
 | Verdict and its reasons | `report.md` top (built from `meta.json`); the word and the reason as printed |
 | Load reached vs planned | `meta.json` → `profile` (`users`, `totalSec`); `summary.json` → `state.testRunDurationMs`, `metrics.vus_max.values.max`, `metrics.http_reqs.values.count` |
-| Each flag: step, value, baseline, limit | `summary.json` → `http_req_duration{name:<step>}.values["p(95)"]`; `meta.json` → `baseline.steps["<step>"].p95`, `rules.flags` (`p95Factor`, `p95AddMs`, `errorRate`, `checkFailureRate`); the p95 limit is the larger of baseline × `p95Factor` and baseline + `p95AddMs` |
+| Each flag: step, value, baseline, limit | `summary.json` → `http_req_duration{name:<step>}.values["p(95)"]`; `meta.json` → `baseline.steps["<step>"].p95`, `rules.flags` (`p95Factor`, `p95AddMs`, `errorRate`, `checkFailureRate`); the p95 limit is the larger of baseline × `p95Factor` and baseline + `p95AddMs`: cite whichever is larger, or both at once as `max(meta.json#rules.flags.p95Factor * <baseline>, <baseline> + meta.json#rules.flags.p95AddMs)`, as `runner/report/viewSteps.ts` does |
 | Slowest steps by p95, with their request counts | `summary.json` → `http_req_duration{name:<step>}.values["p(95)"]` and `.values.count` |
 | Failed requests and checks per step | `summary.json` → `http_req_failed{name:<step>}.values.rate`, `checks{name:<step>}.values.passes` / `.fails` |
 | How it moved over time | `timeseries.json` → `buckets[i]` (`t`, `vus`, `reqs`, `rps`, `p95`, `errors`, `dropped`) |

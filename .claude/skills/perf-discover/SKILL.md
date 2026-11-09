@@ -25,7 +25,8 @@ open question.
    missing). Write the **feature brief** at the top of the feature's `context.md` with all its fields, unknowns included.
 3. **New project** (only when none exists): propose it from `projects/_template/` as `intake.md` says, caps and defaults
    from the table in `.claude/skills/perf-consult/sizing.md`. **Gate A**: the owner approves the project settings.
-   No probe and no recording against the env before that yes.
+   No probe and no recording against the env before that yes (fetching a swagger you were handed is fine). A new env
+   on an existing project goes through the same gate.
 4. **Fill the gaps** with the cheapest honest step, one at a time: read what was given → fetch the swagger → one
    `npm run perf -- probe …` → one question to the person. One question per message. Every answer goes into the evidence
    log; every unanswered gap stays an open question.
@@ -42,7 +43,7 @@ open question.
 - A route in `journey.yaml` that you read in a spec, a ticket, a chat message or a guess, and not in the swagger or a recording.
 - A spec route quietly renamed to the swagger's nearest match. Log the disagreement and ask; do not decide for the owner.
 - An `evidence:` that says "spec", "assumed", "typical", "CHANGE" or names a source you did not open.
-- A probe or recording before Gate A on a new project, or a POST probed that is not in `read_only_post_routes`.
+- A probe or recording before Gate A on a new project or a new env, or a POST probed that is not in `read_only_post_routes`.
 - Two questions in one message, or a gap filled with a plausible value instead of an open question.
 - A writing step with no one to clean up its rows kept in the journey, or `cleanup: app` written without the app's owner saying it prunes them.
 - Typing a password, asking for one in chat, or creating an account. The person logs in in the browser; logins go into `.env` by their own hand.

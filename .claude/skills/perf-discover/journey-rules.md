@@ -41,7 +41,7 @@ evidence: { swagger: "POST /api/items/search (ItemsSearch)", recording: "recordi
   `project.yaml` `read_only_post_routes` after you state why it reads (swagger summary, recording, the developers) and
   the owner says yes.
 - A write is declared under `writes:` with `cleanup: app`, the only mode, **only** when the app's owner or developers
-  confirm the app removes those rows itself. Nobody cleans up → the feature (or that step) is **not testable yet**: say so
+  confirm the app removes those rows itself, and the journey then says `read_only: false`. Nobody cleans up → the feature (or that step) is **not testable yet**: say so
   in the brief and at Gate B, and keep the journey read-only without it. Never force it through.
 - Never a request that creates accounts, deletes data, sends mail or pays, whatever the evidence shows.
 

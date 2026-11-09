@@ -100,4 +100,5 @@ project settings in every case.
 | --- | --- | --- | --- |
 | Public demo site | 5 / 5 | 2 / 2 | `max_duration` 5 minutes; smoke and load only |
 | Shared dev or test env | 20 / 30 | 10 / 15 | a load window outside working hours; the busy check on when there is a database |
+| Local mock / your own machine | any size within the project's caps | any, within the caps | no load window; no busy check (nobody else's work to protect) |
 | Dedicated performance env | ask the owner | ask the owner | you may suggest numbers; never fill them in |

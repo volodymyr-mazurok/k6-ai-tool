@@ -12,7 +12,8 @@ check rests on; nothing else in that file). It never edits `journey.yaml`, `work
 never starts a load, stress or soak run.
 
 **Core rule: a check states what the evidence says the answer is.** A check changes only to match the evidence
-(a recording, the swagger, a probe the journey cites), never to match what the app returned today. A smoke that is red
+(a recording, the swagger, a probe the journey cites) or the owner's own statement in chat, in this session, quoted in
+`context.md` (Rationalizations below), never to match what the app returned today. A smoke that is red
 because the app or the env answers wrongly stays red, and you report it.
 
 **Violating the letter of these rules is violating the spirit.** The runner's rules in `CLAUDE.md` apply unchanged.
@@ -54,7 +55,7 @@ because the app or the env answers wrongly stays red, and you report it.
 ## Red flags: stop
 
 - A content check deleted, renamed away, or replaced with `status 2xx`, `res.body.length > 0` or `true` on a step whose evidence shows a real body.
-- A check rewritten after reading what the app returned, with no recording, swagger or cited probe that says the same.
+- A check rewritten after reading what the app returned, with no recording, swagger, cited probe or quoted owner statement (this session) that says the same.
 - An owner expectation in `context.md` the owner did not say in chat in this session (paraphrased, inferred, "the owner would agree", or from another session).
 - `try`/`catch` around `step()`, a check that returns `true` when parsing fails, or a step skipped when it fails.
 - `journey.yaml`, `project.yaml` (`read_only_post_routes`, `row_count_tables`, caps, abort limits) or `workload.yaml` edited to make a smoke pass.

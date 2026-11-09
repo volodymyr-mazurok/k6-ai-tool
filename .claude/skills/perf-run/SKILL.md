@@ -36,7 +36,8 @@ suggest `--override-window`, `--override-busy` or `--allow-max`, and never pass 
    `perf: verdict <WORD> — <reasons>`. Exit 0 is not a good result; the verdict is. Then `perf: run folder <runDir>`.
 6. **Healthy** (PASS, NO BASELINE, DEGRADED): the run measured what it planned. Hand the folder to perf-report.
    **Unhealthy** (FAIL, INVALID, a refusal, an interrupt): classify it with the table below, naming the file and field
-   that shows it, and what would fix it. One cause per run; when two show, name the first in the table.
+   that shows it, and what would fix it. When several classes show, name the verdict's own class first (INVALID
+   outranks FAIL), then the others, each with its evidence.
 7. **Done:** a run folder with a report, and the one-paragraph account below.
 
 ## Refusals: what each means and what you say
@@ -68,7 +69,7 @@ Read in order: the `perf:` lines, `<runDir>/meta.json`, `<runDir>/k6.log`, `<run
 | --- | --- | --- | --- |
 | `perf: refused (…)`, exit 2 | the printed line; no run folder (`SMOKE_REQUIRED`: the smoke's folder) | guardrail refusal | the refusals table above |
 | Script errors (`ReferenceError`, `TypeError`, `has no content check`), or "does not match the journey" | `meta.json` → `k6.scriptErrors`, `checks`; `k6.log` | script bug | perf-script, then a fresh smoke |
-| `aborted by a k6 threshold: http_req_duration … p(95)<…` | `meta.json` → `k6.abortReason` = `thresholds`; the verdict reason names the metric; `timeseries.json` → `buckets[].p95` and `vus` | guardrail abort; the cause is app slow or env overloaded | p95 rising with `vus` while the smoke was fast → capacity (perf-report, perf-consult); p95 high from the first bucket → a slow step or env, look at the slowest step |
+| `aborted by a k6 threshold: http_req_duration … p(95)<…` | `meta.json` → `k6.abortReason` = `thresholds`; the verdict reason names the metric; `timeseries.json` → `buckets[].p95` and `vus` | guardrail abort; the cause is app slow or env overloaded | **app slow:** `timeseries.json` p95 grows with `vus`, `errors` stay 0 and `k6.log` shows nothing from the load machine (no timeouts, connection or DNS errors) → capacity (perf-report, perf-consult). **Env overloaded:** p95 high from the first bucket, or rising while `vus` is flat, or `db.json` CPU/IO high, or other people's load on the env → say so; the run measured the env, not the app |
 | `aborted by a k6 threshold: http_req_failed …`, or failed checks on a step | `summary.json` → `http_req_failed{name:<step>}.values.rate`, `checks{name:<step>}.values.fails`; `k6.log` | app error (one step, 4xx/5xx or wrong bodies) or env (every step) | confirm one step with `npm run perf -- probe …`; report to the app's team; never retry it into green |
 | Connection refused, timeouts, DNS, `token endpoint returned …` | `k6.log`; `http_req_failed` near 100% on every step | env down or accounts | the person checks the env and `.env` (`npm run perf -- doctor <project> --env <env>`); one rerun after they say it is back |
 | `stopped by the database guard` | `meta.json` → `k6.abortReason` = `db`; `db.json` | guardrail abort; env overloaded or the guard went blind | the database's owner; rerun only on the person's word |
@@ -93,7 +94,7 @@ Go? (one yes = this one run)
 
 ```markdown
 ### Refused: <project>/<feature> <profile> on <env> — nothing ran
-- Runner: `perf: refused (<CODE>): <the reason, without the override sentence>`
+- Runner: `perf: refused (<CODE>): <the reason as printed, up to the override sentence> (override sentence omitted)`
 - <OUTSIDE_WINDOW: Window <weekdays> UTC on weekdays, <weekends>; now <day HH:MM> UTC; next allowed start <day HH:MM> UTC (latest start <HH:MM> UTC for this <duration> run)>
 - Next: <what would let it run, and whose call it is>. I can dry-run it again then.
 ```

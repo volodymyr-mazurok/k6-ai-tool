@@ -470,11 +470,21 @@ list markers, anything in `` `inline code` `` or a fenced block, and the dates a
 
 ## 10. Adding a feature or a project
 
-A later plan will add Claude Code skills for this: **perf-discover** (find the feature's real requests from the spec, the
-swagger and a recorded run, and write `journey.yaml` and `workload.yaml`), **perf-script** (write the k6 script and run it
-until its smoke is green), **perf-run** and **perf-report**, and a consultant, **perf-consult**, which will give sizing
-advice before a run, a plain-language analysis with cited reference points and improvement suggestions after it, and,
-if you want it, guidance from start to end. None of them is built yet. Until they are, do the same steps by hand:
+Claude Code skills in `.claude/skills/` do this with you; each stops where the owner has to say yes:
+
+| Skill | What it does | Where it stops for the owner |
+| --- | --- | --- |
+| **perf-consult** | the front door: sizing before a run (business numbers to users, think time and req/s, the arithmetic shown) and a plain-language analysis after it, with cited reference points and ranked suggestions | sizing proposals change `workload.yaml` only after a yes |
+| **perf-discover** | finds the feature's real requests from what you hand it (a spec, the swagger, a link to record, a HAR, a curl, another repo's test) and writes `journey.yaml`, `workload.yaml` and `context.md`; proposes a new project from the template | Gate A: a new project's or env's settings; Gate B: the journey review |
+| **perf-script** | writes the k6 script and runs it until its smoke is green, without weakening a check | a red smoke caused by the app or env is reported, not worked around |
+| **perf-run** | the dry run, the run, and what a refusal or an unhealthy run means | every load, stress or soak run waits for the owner's go after the dry run |
+| **perf-report** | `findings.md` for a run folder, every number cited and checked with `--verify-findings` | accepting a baseline is the owner's call |
+
+Just say what you want ("load test the item search"); perf-consult answers and offers **guided mode**, which goes
+discover → script and smoke → sizing → dry run and go → run → findings → analysis, stopping at every gate above with a
+status line after each stage ("done: journey reviewed; next: script and smoke"). It never starts a load without your go.
+
+The same steps by hand, for when the skills are not available (or to see what they do):
 
 1. Record what the feature really sends: `npm run perf -- record <p> --env <env> --start <app url> --out projects/<p>/features/<f>/recordings/<name>.json`
    opens a browser, you drive the app and close it, and only the scrubbed recording (and `<name>.auth.json`, the shape of the
@@ -533,7 +543,9 @@ Grafana's public QuickPizza demo app at https://quickpizza.grafana.com with no s
 a static header with a random token per virtual user, caps of 5 users, 5 requests per second and 5 minutes, smoke and load
 only, and one write that the app prunes itself. Its own `README.md` says how to run it, what its report shows and does not
 show, and how it maps to `projects/_template/`. It is a shared public site, so run it with small loads only and keep to
-section 1.
+section 1. To try the skills on it, ask for a test of one of its features; the caps in its `project.yaml` (the public
+demo row of perf-consult's sizing table) still bound every proposal. The self-test project on the local mock is the
+place to walk guided mode end to end without touching anyone's env.
 
 ## 12. Further reading
 

@@ -65,10 +65,22 @@ When Chromium cannot start they are skipped with a loud message; `PERF_SKIP_BROW
 
 ## Skills
 
-The agent skills are not built yet. A later plan will add perf-discover, perf-script, perf-run, perf-report and a
-consultant, perf-consult (sizing advice before a run, a plain-language analysis with cited reference points and
-improvement suggestions after it, optional start-to-end guidance). Until then do the steps by hand as README section 10
-describes, and do not pretend a skill ran.
+Five agent skills in `.claude/skills/` do the work of README section 10. Each keeps the rules above and adds gates
+where the owner says yes. Use the one that matches the request; do not do a skill's job by hand while it is installed,
+and never say a skill ran when it did not.
+
+| Skill | Fires when | Ends with |
+| --- | --- | --- |
+| `perf-consult` | "performance test / load test this …", how many users or how big a run, "is this fast enough", explain a report; the front door | sizing in the feature's `context.md`, or part 2 of `findings.md`; on *guided*, the whole chain below |
+| `perf-discover` | a feature has no reviewed `journey.yaml`; a spec, swagger, link, HAR, curl or another repo's test is handed over; a new project or env is needed | Gate A (project or env settings), `perf check` 0 problems, Gate B (the owner reviews the journey) |
+| `perf-script` | a reviewed journey needs its k6 script, or a smoke is red | a green smoke without a weakened check, or a report that the app or env is at fault |
+| `perf-run` | run a load, stress or soak; a refusal; a FAIL, INVALID, aborted or interrupted run | a dry run and the owner's go, then the run and its class |
+| `perf-report` | a run folder needs findings, a baseline comparison, or `--verify-findings` complains | `findings.md` with every number cited and `--verify-findings` passing |
+
+**Guided mode** (say *guided* to perf-consult): discover → script and smoke → sizing → dry run and go → run → findings
+→ analysis, stopping at every gate, with a status line after each stage ("done: journey reviewed; next: script and
+smoke"). It never starts a load, stress or soak run without the owner's go after the dry run. Without the skills, do
+the same steps by hand as README section 10 describes.
 
 ## Working style
 
