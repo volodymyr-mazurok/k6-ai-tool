@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { mock, test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { main } from './cli.js';
-import { summarizeHar } from './har.js';
+import { authSummary, summarizeHar } from './har.js';
 
 const MINI_HAR = fileURLToPath(new URL('../tests/fixtures/mini.har', import.meta.url));
 const API = 'https://api.example.test/api';
@@ -251,4 +251,136 @@ test('har-summary refuses a call without --api or --out (exit 2)', async () => {
   assert.equal(await main(['har-summary', MINI_HAR, '--out', '/tmp/never-written.json']), 2);
   assert.equal(await main(['har-summary', MINI_HAR, '--api', API]), 2);
   assert.equal(await main(['har-summary', '--api', API, '--out', '/tmp/never-written.json']), 2);
+});
+
+// ---------------------------------------------------------------------------------------------------------------
+// authSummary: how the app signs its API calls, as a shape; never a value
+// ---------------------------------------------------------------------------------------------------------------
+
+/** An entry with exactly these request headers (and cookies), unlike `entry`, which always carries a bearer. */
+function headed(url: string, headers: Record<string, string>, extra: Partial<EntryOptions> = {}): Record<string, unknown> {
+  const base = entry({ url, ...extra }) as { request: Record<string, unknown> };
+  base.request.headers = Object.entries(headers).map(([name, value]) => ({ name, value }));
+  base.request.cookies = [];
+  return base;
+}
+
+const apiCall = `${API}/items`;
+
+test('authSummary: a bearer JWT is scheme bearer, shape JWT, and the summary holds no value', async () => {
+  await withHar([headed(apiCall, { Authorization: `Bearer ${JWT}`, accept: '*/*' })], (harPath) => {
+    const auth = authSummary(harPath, API);
+    assert.deepEqual(auth, { scheme: 'bearer', header: 'Authorization', valueShape: 'JWT', tokenRequests: 0 });
+    const text = JSON.stringify(auth);
+    assert.ok(!text.includes(JWT) && !text.includes('eyJ'));
+  });
+});
+
+test('authSummary: "Authorization: token abcdef0123456789" is scheme token, 16 letters and digits', async () => {
+  await withHar([headed(apiCall, { authorization: 'token abcdef0123456789' })], (harPath) => {
+    const auth = authSummary(harPath, API);
+    assert.deepEqual(auth, { scheme: 'token', header: 'Authorization', valueShape: '16 letters and digits', tokenRequests: 0 });
+    assert.ok(!JSON.stringify(auth).includes('abcdef0123456789'));
+  });
+});
+
+test('authSummary: an opaque bearer, a basic pair, an api-key header and a cookie each get their scheme and a shape', async () => {
+  await withHar(
+    [headed(apiCall, { Authorization: `Bearer ${OPAQUE}` })],
+    (harPath) => assert.deepEqual(authSummary(harPath, API), { scheme: 'bearer', header: 'Authorization', valueShape: '44 letters and digits', tokenRequests: 0 }),
+  );
+  await withHar(
+    [headed(apiCall, { Authorization: `Basic ${Buffer.from('someone:hunter2-pass').toString('base64')}` })],
+    (harPath) => {
+      const auth = authSummary(harPath, API);
+      assert.equal(auth.scheme, 'basic');
+      assert.equal(auth.valueShape, 'base64 user:password pair');
+      assert.ok(!JSON.stringify(auth).includes('someone'));
+    },
+  );
+  await withHar([headed(apiCall, { 'X-Api-Key': 'k-1234567890abcdef' })], (harPath) => {
+    const auth = authSummary(harPath, API);
+    assert.equal(auth.scheme, 'api-key-header');
+    assert.equal(auth.header, 'X-Api-Key');
+    assert.ok(!JSON.stringify(auth).includes('1234567890'));
+  });
+  await withHar([headed(apiCall, { Cookie: 'session=abc123def456; theme=dark' })], (harPath) => {
+    const auth = authSummary(harPath, API);
+    assert.deepEqual(auth, { scheme: 'cookie', header: 'Cookie', valueShape: '2 cookies', tokenRequests: 0 });
+  });
+});
+
+test('authSummary: no credentials on the API calls is scheme none; only calls under the api url count', async () => {
+  await withHar(
+    [headed(apiCall, { accept: '*/*' }), headed('https://other.example.test/x', { Authorization: `Bearer ${JWT}` })],
+    (harPath) => {
+      const auth = authSummary(harPath, API);
+      assert.equal(auth.scheme, 'none');
+      assert.equal(auth.header, null);
+    },
+  );
+});
+
+test('authSummary: counts the token requests (POST to a token or login route, on any host)', async () => {
+  await withHar(
+    [
+      headed('https://login.example.test/oauth2/v2.0/token', {}, { method: 'POST' }),
+      headed('https://login.example.test/connect/token', {}, { method: 'POST' }),
+      headed(`${API}/account/login`, {}, { method: 'POST' }),
+      headed('https://login.example.test/connect/token', {}, { method: 'GET' }),
+      headed(`${API}/items/token-count`, {}, { method: 'POST' }),
+      headed(apiCall, { Authorization: `Bearer ${JWT}` }),
+    ],
+    (harPath) => {
+      const auth = authSummary(harPath, API);
+      assert.equal(auth.tokenRequests, 3);
+      assert.equal(auth.scheme, 'bearer');
+    },
+  );
+});
+
+test('authSummary rejects a file that is not a HAR', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'perf-har-'));
+  try {
+    const file = join(dir, 'x.har');
+    await writeFile(file, '{"nope":1}');
+    assert.throws(() => authSummary(file, API), /not a HAR/);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test('summarizeHar drops login identities: a login POST keeps neither the user name nor the e-mail', async () => {
+  await withHar(
+    [
+      entry({
+        url: `${API}/account/login`,
+        method: 'POST',
+        postText: JSON.stringify({
+          username: 'jane.doe',
+          UserName: 'jdoe',
+          user: 'jd',
+          Email: 'jane.doe@example.test',
+          'e-mail': 'jd@example.test',
+          login: 'jdoe2',
+          phoneNumber: '+44 20 7946 0000',
+          rememberMe: true,
+          userId: GUID,
+        }),
+      }),
+      entry({
+        url: `${API}/search?q=jane.doe%40example.test&contact=${encodeURIComponent('Jane <j.doe+x@mail.example.test>')}&page=1`,
+        method: 'POST',
+        postText: JSON.stringify({ Search: 'mail jane.doe@example.test today', list: ['x.y@example.test', 'ok'] }),
+      }),
+    ],
+    (harPath) => {
+      const out = summarizeHar(harPath, API);
+      assert.deepEqual(out[0]!.requestBody, { rememberMe: true, userId: GUID });
+      assert.deepEqual(out[1]!.requestBody, { Search: 'mail [redacted] today', list: ['[redacted]', 'ok'] });
+      assert.equal(out[1]!.path, '/search?q=[redacted]&contact=[redacted]&page=1');
+      const text = JSON.stringify(out);
+      for (const secret of ['jane.doe', 'jdoe', '"jd"', 'example.test', '7946', '@']) assert.ok(!text.includes(secret), `output must not contain ${secret}`);
+    },
+  );
 });

@@ -48,22 +48,39 @@ npm test                                   # unit tests; must end with "# fail 0
 npx tsc --noEmit                           # type check; must be clean
 npm run perf -- doctor [<project> --env <env>]
 npm run perf -- check <project> <feature> --env <env>               # "0 problems"
+npm run perf -- probe <project> GET <path> --env <env>             # one request: status, timing, shape; never a token
+npm run perf -- record <project> --env <env> --start <app url> --out <recording.json>   # a browser session, scrubbed; the user drives and logs in
 npm run perf -- run <project> <feature> --profile smoke --env <env>
 npm run perf -- run <project> <feature> --profile load --env <env> --dry-run
 npm run perf -- selftest                   # known-answer test against the local mock, about 10 minutes
 npm run perf -- report <runDir> --verify-sources
+npm run perf -- report <runDir> --verify-findings    # also: every number in findings.md is cited N[[fmt|source]] (README section 7)
 npm run mock                               # local mock server on port 4010
 scripts/check-shared.sh                    # HEAD without any real project: npm ci, test, tsc, word grep (shared files only)
 ```
 
 Unit tests: `npx tsx --test <file>`. Tests that touch a real env run only with `PERF_LIVE=1`; never set it without the owner's OK.
+The `perf record` tests drive Chromium (Playwright, a devDependency; the browser itself is installed once with `npx playwright install chromium`).
+When Chromium cannot start they are skipped with a loud message; `PERF_SKIP_BROWSER=1` skips them on purpose.
 
 ## Skills
 
-The agent skills are not built yet. A later plan will add perf-discover, perf-script, perf-run, perf-report and a
-consultant, perf-consult (sizing advice before a run, a plain-language analysis with cited reference points and
-improvement suggestions after it, optional start-to-end guidance). Until then do the steps by hand as README section 10
-describes, and do not pretend a skill ran.
+Five agent skills in `.claude/skills/` do the work of README section 10. Each keeps the rules above and adds gates
+where the owner says yes. Use the one that matches the request; do not do a skill's job by hand while it is installed,
+and never say a skill ran when it did not.
+
+| Skill | Fires when | Ends with |
+| --- | --- | --- |
+| `perf-consult` | "performance test / load test this …", how many users or how big a run, "is this fast enough", explain a report; the front door | sizing in the feature's `context.md`, or part 2 of `findings.md`; on *guided*, the whole chain below |
+| `perf-discover` | a feature has no reviewed `journey.yaml`; a spec, swagger, link, HAR, curl or another repo's test is handed over; a new project or env is needed | Gate A (project or env settings), `perf check` 0 problems, Gate B (the owner reviews the journey) |
+| `perf-script` | a reviewed journey needs its k6 script, or a smoke is red | a green smoke without a weakened check, or a report that the app or env is at fault |
+| `perf-run` | run a load, stress or soak; a refusal; a FAIL, INVALID, aborted or interrupted run | a dry run and the owner's go, then the run and its class |
+| `perf-report` | a run folder needs findings, a baseline comparison, or `--verify-findings` complains | `findings.md` with every number cited and `--verify-findings` passing |
+
+**Guided mode** (say *guided* to perf-consult): discover → script and smoke → sizing → dry run and go → run → findings
+→ analysis, stopping at every gate, with a status line after each stage ("done: journey reviewed; next: script and
+smoke"). It never starts a load, stress or soak run without the owner's go after the dry run. Without the skills, do
+the same steps by hand as README section 10 describes.
 
 ## Working style
 

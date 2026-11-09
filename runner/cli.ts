@@ -1,20 +1,23 @@
 // perf <command>: the runner's command line (`npm run perf -- <command> …`).
 // Exit codes: 0 done, 1 the run failed (or `check` found problems, `doctor` a failing check, or a `selftest` check
-// failed), 2 refused (guardrail, config, journey check, a baseline that cannot be accepted) or misused, 130 interrupted.
+// failed), 2 refused (guardrail, config, journey check, a probe request that is not allowed, a baseline that cannot be accepted) or misused, 130 interrupted.
 
-import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { parseArgs } from 'node:util';
 import { loadAdapter } from './adapter.js';
 import { acceptBaseline, BaselineRefusedError, compareRuns } from './baseline.js';
 import { checkFeature, formatProblem, JourneyCheckError, SwaggerError } from './checks.js';
-import { ConfigError, loadFeature, loadProject, type Project } from './config.js';
+import { ConfigError, loadFeature, loadProject, REPO_ROOT, type Project } from './config.js';
 import { doctor, formatCheck } from './doctor.js';
 import { formatDryRun, planRun } from './dryRun.js';
 import { acquireEnvLock, checkEnv, GuardrailError, type ProfileType } from './guardrails.js';
 import { summarizeHar } from './har.js';
+import { referenceIds } from './knowledge.js';
+import { formatProbe, probe, ProbeRefusedError } from './probe.js';
 import { NotARunFolderError, renderRunReport, verifyRunReport } from './report/build.js';
+import { authPath, driveActions, parseActions, record } from './record.js';
 import { runFeature, RunInterruptedError } from './run.js';
 import type { Verdict } from './report/model.js';
 import { formatSelftest, runSelftest } from './selftest/selftest.js';
@@ -46,14 +49,35 @@ Commands:
       (a value that looks like a number becomes a number). Which keys exist is the project's business; the adapter says what it needs.
   teardown <project> --env <env>
       Remove the standing test data the setup created (only rows the project's own naming marks as its own).
-  report <runDir> [--verify-sources]
+  probe <project> <METHOD> <path> --env <env> [--feature <feature>] [--body <file.json>] [--role <role>]
+      Send ONE authenticated request to the env's API and print what came back: status, time, content type, size and the shape
+      of a JSON answer (keys, types, array lengths; a number's value only under a count, size, length or page-number key; never a string). Never prints
+      a token, a password or a header. <path> may leave out the API base's own path. Sends a GET; a POST only to a route in the
+      project's read_only_post_routes; any other request only when --feature declares it in writes: (else exit code 2,
+      PROBE_REFUSED, nothing sent). --role picks the account (default: the project's first role). 30 s timeout. Exits 0 when the
+      API answered, whatever its status; 1 when it did not (or the token request failed).
+  report <runDir> [--verify-sources | --verify-findings]
       Write report.html and report.md for a run folder (a run writes them itself at its end; use this to redo them after a
       change to findings.md or to the report code). --verify-sources then checks every number on the page against the folder's
-      files and prints "all N numbers traced", or the numbers that differ (exit code 1).
+      files and prints "all N numbers traced", or the numbers that differ (exit code 1). --verify-findings does that too and
+      checks findings.md: every number is written N[[format|source]] and gives N, every [ref:id] is in knowledge/references.md,
+      and no number stands uncited. Prints "findings: N numbers traced, M references", or the problems (exit code 1).
   har-summary <har> --api <url> --out <json>
       Write the scrubbed summary of a recorded HAR (method, path, status, ms, request body, response top-level keys of the
-      calls under --api; no headers, cookies or tokens) as evidence for a journey. Delete the raw HAR afterwards. Exits 1 with
+      calls under --api; no headers, cookies, tokens or login identities such as user names and e-mail addresses) as evidence for a journey. Delete the raw HAR afterwards. Exits 1 with
       a warning when no call is under --api (the url is probably wrong).
+  record <project> --env <env> --start <url> --out <recording.json> [--actions <file.json>]
+      Record a real browser session as evidence for a journey. A browser window opens at --start: drive the app, log in
+      yourself if asked, and close the window when done. Writes --out (the scrubbed har-summary JSON of the calls under the
+      env's api url) and the way the app signs in as a shape (scheme, header name, kind and length of the value; never the
+      value) next to it as <out minus .json>.auth.json. The raw HAR lives in a temp folder and is deleted in every case.
+      Exits 1 and writes nothing when no call under the env's api url was recorded (the api url is probably wrong).
+      --actions <file>    no window: headless, run a JSON list of actions, then close. Each element is one of
+                          {"goto":"<url>"}, {"click":"<selector>"}, {"fill":["<selector>","<text>"]}, {"wait":<ms>}.
+                          Unknown keys are refused (exit code 2); the session may not leave --start's origin (goto, click
+                          or redirect; refused, exit code 2), --start must be on the origin of the env's app url or api url,
+                          and nothing is filled on a page with a password field or into a password-like field (log in with
+                          a window instead).
   baseline accept <runDir>
       Make a run the reference for its feature, env and profile: its per-step p50/p95/p99, error rate and req/s go to that slot
       of the feature's baseline.json (other slots stay; an earlier baseline of the slot is replaced). Refuses a smoke, FAIL or
@@ -140,6 +164,37 @@ async function doctorCommand(args: string[]): Promise<number> {
   return failed === 0 ? 0 : 1;
 }
 
+async function probeCommand(args: string[]): Promise<number> {
+  const { values, positionals } = parseArgs({
+    args,
+    allowPositionals: true,
+    options: { env: { type: 'string' }, feature: { type: 'string' }, body: { type: 'string' }, role: { type: 'string' } },
+  });
+  const [projectName, method, path, ...extra] = positionals;
+  if (!projectName || !method || !path || extra.length > 0) throw new UsageError('probe needs <project> <METHOD> <path>');
+  if (!values.env) throw new UsageError('probe needs --env <env>');
+
+  let body: unknown;
+  if (values.body !== undefined) {
+    let text: string;
+    try {
+      text = readFileSync(values.body, 'utf8');
+    } catch {
+      throw new UsageError(`--body ${values.body}: cannot read the file`);
+    }
+    try {
+      body = JSON.parse(text);
+    } catch {
+      throw new UsageError(`--body ${values.body}: not valid JSON`); // the parser's own message quotes the text
+    }
+  }
+  const project = await loadProject(projectName);
+  const feature = values.feature ? await loadFeature(project, values.feature) : undefined;
+  const result = await probe({ project, feature, env: values.env, method, path, body, role: values.role });
+  for (const line of formatProbe(method, path, result)) console.log(line);
+  return 0;
+}
+
 async function checkCommand(args: string[]): Promise<number> {
   const { values, positionals } = parseArgs({ args, allowPositionals: true, options: { env: { type: 'string' } } });
   const [projectName, featureName, ...extra] = positionals;
@@ -205,7 +260,7 @@ async function teardownCommand(args: string[]): Promise<number> {
 }
 
 async function reportCommand(args: string[]): Promise<number> {
-  const { values, positionals } = parseArgs({ args, allowPositionals: true, options: { 'verify-sources': { type: 'boolean', default: false } } });
+  const { values, positionals } = parseArgs({ args, allowPositionals: true, options: { 'verify-sources': { type: 'boolean', default: false }, 'verify-findings': { type: 'boolean', default: false } } });
   const [dir, ...extra] = positionals;
   if (!dir || extra.length > 0) throw new UsageError('report needs <runDir>');
   const runDir = resolve(dir);
@@ -217,6 +272,7 @@ async function reportCommand(args: string[]): Promise<number> {
     return 1;
   }
   console.log(`perf: report written: ${join(runDir, 'report.html')} (and report.md)`);
+  if (values['verify-findings']) return verifyFindingsCommand(runDir);
   if (!values['verify-sources']) return 0;
 
   const { checked, mismatches } = await verifyRunReport(runDir);
@@ -226,6 +282,28 @@ async function reportCommand(args: string[]): Promise<number> {
     return 1;
   }
   console.log(`perf: all ${checked} numbers traced`);
+  return 0;
+}
+
+/** The ids of the repo's knowledge/references.md (found from the runner's own location, whatever the current directory is). */
+async function knownReferences(): Promise<Set<string>> {
+  try {
+    return await referenceIds(REPO_ROOT);
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === 'ENOENT') throw new Error(`knowledge/references.md not found under ${REPO_ROOT}`);
+    throw err;
+  }
+}
+
+/** `perf report <runDir> --verify-findings`: the page's numbers, then findings.md's citations, references and uncited numbers. */
+async function verifyFindingsCommand(runDir: string): Promise<number> {
+  const { mismatches, findings } = await verifyRunReport(runDir, { refs: await knownReferences() });
+  if (mismatches.length > 0) {
+    for (const mismatch of mismatches) console.log(`perf: ${mismatch}`);
+    console.log(`perf: ${mismatches.length} problem${mismatches.length === 1 ? '' : 's'} in the report or findings.md`);
+    return 1;
+  }
+  console.log(`perf: findings: ${findings!.numbers} numbers traced, ${findings!.references} references`);
   return 0;
 }
 
@@ -278,6 +356,56 @@ function harSummaryCommand(args: string[]): number {
   return 0;
 }
 
+async function recordCommand(args: string[]): Promise<number> {
+  const { values, positionals } = parseArgs({
+    args,
+    allowPositionals: true,
+    options: { env: { type: 'string' }, start: { type: 'string' }, out: { type: 'string' }, actions: { type: 'string' } },
+  });
+  const [projectName, ...extra] = positionals;
+  if (!projectName || extra.length > 0) throw new UsageError('record needs <project>');
+  if (!values.env) throw new UsageError('record needs --env <env>');
+  if (!values.start) throw new UsageError('record needs --start <url>');
+  if (!values.out) throw new UsageError('record needs --out <recording.json>');
+  let start: URL;
+  try {
+    start = new URL(values.start);
+  } catch {
+    throw new UsageError(`--start ${JSON.stringify(values.start)} is not a url`);
+  }
+  if (!/^https?:$/.test(start.protocol)) throw new UsageError('--start must be an http(s) url');
+
+  const project = await loadProject(projectName);
+  const config = checkEnv(project, values.env);
+
+  let drive: ReturnType<typeof driveActions> | undefined;
+  if (values.actions !== undefined) {
+    // A headless session is driven by a list, so it may only visit the app of this env.
+    const allowed = [config.appUrl, config.apiUrl].flatMap((url) => (url ? [new URL(url).origin] : []));
+    if (!allowed.includes(start.origin)) {
+      throw new ConfigError(`--start ${start.origin} is not the app url or api url of env ${values.env}; a headless recording (--actions) stays on the env's app (allowed: ${allowed.join(', ')})`);
+    }
+    let json: unknown;
+    try {
+      json = JSON.parse(readFileSync(values.actions, 'utf8'));
+    } catch (err) {
+      throw new UsageError(`--actions ${values.actions}: ${(err as NodeJS.ErrnoException).code === 'ENOENT' ? 'cannot read the file' : 'cannot read the file or it is not valid JSON'}`);
+    }
+    drive = driveActions(parseActions(json, values.start));
+  }
+
+  const result = await record({ startUrl: values.start, apiUrl: config.apiUrl, out: values.out, headless: drive !== undefined, drive });
+  if (result.calls === 0) {
+    console.error(`perf: no API calls under ${config.apiUrl} were recorded — wrong --env api url, or the flow never reached the API`);
+    return 1;
+  }
+  const { auth } = result;
+  console.log(`perf: ${result.calls} API call${result.calls === 1 ? '' : 's'} recorded into ${values.out}`);
+  console.log(`perf: auth: ${auth.scheme}${auth.header ? ` (${auth.header})` : ''}, ${auth.valueShape}, ${auth.tokenRequests} token request${auth.tokenRequests === 1 ? '' : 's'} -> ${authPath(values.out)}`);
+  console.log('perf: the raw HAR was deleted; only the scrubbed summary and the auth shape were kept');
+  return 0;
+}
+
 /** Run the CLI with `argv` (without node and the script); returns the exit code. */
 export async function main(argv: string[]): Promise<number> {
   const [command, ...rest] = argv;
@@ -289,17 +417,23 @@ export async function main(argv: string[]): Promise<number> {
     if (command === 'doctor') return await doctorCommand(rest);
     if (command === 'run') return await runCommand(rest);
     if (command === 'check') return await checkCommand(rest);
+    if (command === 'probe') return await probeCommand(rest);
     if (command === 'setup') return await setupCommand(rest);
     if (command === 'teardown') return await teardownCommand(rest);
     if (command === 'report') return await reportCommand(rest);
     if (command === 'baseline') return await baselineCommand(rest);
     if (command === 'compare') return await compareCommand(rest);
     if (command === 'har-summary') return harSummaryCommand(rest);
+    if (command === 'record') return await recordCommand(rest);
     if (command === 'selftest') return await selftestCommand(rest);
     throw new UsageError(`unknown command ${command}`);
   } catch (err) {
     if (err instanceof UsageError || (err as NodeJS.ErrnoException).code?.startsWith('ERR_PARSE_ARGS')) {
       console.error(`perf: ${(err as Error).message}\n\n${USAGE}`);
+      return 2;
+    }
+    if (err instanceof ProbeRefusedError) {
+      console.error(`perf: refused (${err.code}): ${err.message}`);
       return 2;
     }
     if (err instanceof GuardrailError) {

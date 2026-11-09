@@ -131,11 +131,13 @@ Run them from the repo root. `<runDir>` is a folder under `results/`.
 | `npm run perf -- run <project> <feature> --profile smoke\|load\|stress\|soak --env <env>` | A full run: guardrails, k6, database evidence, row counts, report. A load, stress or soak run does a smoke first if none passed yet. |
 | `… run … --dry-run` | Shows users, req/s, duration, abort limits and the exact k6 command. Sends nothing, takes no lock, writes nothing. The guardrails still apply: outside the window a load dry run is refused. |
 | `npm run perf -- check <project> <feature> --env <env>` | Checks `journey.yaml` against the env's swagger without running anything. Prints `0 problems` when it is fine. |
+| `npm run perf -- probe <project> <METHOD> <path> --env <env> [--feature <f>] [--body <file.json>] [--role <role>]` | One authenticated request, to learn what a route answers: prints `200 GET /api/x 133 ms application/json 2,340 bytes` and the shape of a JSON answer (keys, types, array lengths, a number only under a count, size, length or page-number key such as `totalCount` or `pageSize`, never under a money-like `totalPrice`; never a string, a token or a header). Sends a GET; a POST only to a route in the project's `read_only_post_routes`; any other request only when `--feature` declares it in `writes:`, else it is refused (exit 2, `PROBE_REFUSED`). `<path>` may leave out the API base's own path. Exit 0 when the API answered, whatever its status. |
 | `npm run perf -- setup <project> --env <env>` / `teardown …` | Create (idempotently) or remove a project's standing test data, for projects that have any. `teardown` deletes what the tests search, so run it only when told to. Neither is bound by the caps or the load window: the project's adapter owns their pace. |
-| `npm run perf -- report <runDir> [--verify-sources]` | Rewrite the report of a run folder; `--verify-sources` checks every number on the page against the run's files. |
+| `npm run perf -- report <runDir> [--verify-sources\|--verify-findings]` | Rewrite the report of a run folder; `--verify-sources` checks every number on the page against the run's files, `--verify-findings` does that and also checks that every number in `findings.md` is cited (section 7). |
 | `npm run perf -- baseline accept <runDir>` | Make a run the reference that later runs of the same feature, env and profile are compared with. It refuses a smoke, FAIL or INVALID run. It is written to `baseline.json` in the feature's folder; commit it if the team should share it. Reports already written, and a re-render of them, keep the baseline their run was judged against. |
 | `npm run perf -- compare <runDirA> <runDirB>` | Table of the p95 per step in two runs, with the change in percent. |
-| `npm run perf -- har-summary <har> --api <url> --out <json>` | Scrub a recorded HAR to the evidence a journey cites (method, path, status, body shape; no headers or tokens). |
+| `npm run perf -- record <project> --env <env> --start <url> --out <recording.json> [--actions <file.json>]` | Record a real browser session as evidence for a journey: a window opens at `--start`, you drive the app (log in yourself if asked) and close the window. Writes `<out>` (the same scrubbed summary `har-summary` makes, of the calls under the env's api url) and `<out minus .json>.auth.json`: how the app signs its calls as a shape (scheme, header name, kind and length of the value such as `JWT` or `16 letters and digits`, number of token requests), never the value. The raw HAR stays in a temp folder and is deleted in every case. Exit 1 and nothing written when no call reached the api url (the url is probably wrong). `--actions` runs headless instead: a JSON list of `{"goto":"<url>"}`, `{"click":"<selector>"}`, `{"fill":["<selector>","<text>"]}`, `{"wait":<ms>}`; unknown keys are refused (exit 2), a `goto` may not leave `--start`'s origin and neither may a click or a redirect (the session is refused, exit 2, nothing written; after a server redirect to another origin the browser has already sent that one request, which carries no token of ours), `--start` must be on the origin of the env's app url or api url, and nothing is filled on a page that has a password field or into a field named, labelled or described as a password (log in with a window instead). Needs Playwright's Chromium (`npx playwright install chromium`, once). |
+| `npm run perf -- har-summary <har> --api <url> --out <json>` | Scrub a recorded HAR to the evidence a journey cites (method, path, status, body shape; no headers, tokens or login identities such as user names and e-mail addresses). |
 | `npm run perf -- selftest` | Tests the framework itself against the local mock (about 10 minutes, nothing leaves your machine, needs no `.env`). |
 | `npm run mock` | Starts the local mock server on port 4010. |
 | `npm test` | Unit tests. |
@@ -416,6 +418,27 @@ recommendations**.
 file and the path it came from. To check them, run `npm run perf -- report <runDir> --verify-sources`: it prints
 `all N numbers traced`, or the numbers that differ from their source (exit code 1). Use it before you quote a figure.
 
+**Citing a number in `findings.md`.** A number in `findings.md` is written with the source it came from, directly after it
+with no space: `<number>[[<format>|<source>]]`. The source is the same expression the report uses (`<file>#<path>`, with
+arithmetic if needed) and the format one of `int`, `dec1`, `dec2`, `pct`, `pctPoints`, `signedInt`, `signedPct`, `dur`,
+`ratio`. A unit goes between the number and the brackets and stays outside the format:
+
+```text
+The p95 of items.search was 433 ms[[int|summary.json#metrics["http_req_duration{name:items.search}"].values["p(95)"]]]
+and 1.2%[[pct|summary.json#metrics.http_req_failed.values.rate]] of its requests failed [ref:nielsen-response-times].
+```
+
+The number must be what the format gives for the source: `0.43 s` against a p95 in milliseconds is wrong (write `433 ms` with
+`int`), and `pct` takes a fraction (0.012 reads 1.2%) while `pctPoints` takes a value that is already a percent. In the
+report each cited number becomes a number element like the rest, so `--verify-sources` traces it. `[ref:<id>]` cites an entry
+of `knowledge/references.md` and shows as `[id]`. To check the file, run
+`npm run perf -- report <runDir> --verify-findings`: it does what `--verify-sources` does, then reads `findings.md` and prints
+`findings: N numbers traced, M references`, or one line per problem (exit code 1): a number that differs from its source, an
+unknown format or reference, a malformed citation, or a number with no citation (`uncited number "433" in line 7`). Only
+numbers count: a token that starts with a digit (after an optional `+` or `-`), such as `433`, `1,446`, `12%` or `5 users`.
+Free text may hold identifiers with letters before the digits (`p95`, `k6`, `S1`, `UTF-8`, `items.b2`, `p(95)`), headings,
+list markers, anything in `` `inline code` `` or a fenced block, and the dates and times of a line that starts with `Run:`.
+
 ## 8. Glossary
 
 - **Latency**: how long one request takes, from sent to answered. Reported as p50, p95, p99.
@@ -447,17 +470,30 @@ file and the path it came from. To check them, run `npm run perf -- report <runD
 
 ## 10. Adding a feature or a project
 
-A later plan will add Claude Code skills for this: **perf-discover** (find the feature's real requests from the spec, the
-swagger and a recorded run, and write `journey.yaml` and `workload.yaml`), **perf-script** (write the k6 script and run it
-until its smoke is green), **perf-run** and **perf-report**, and a consultant, **perf-consult**, which will give sizing
-advice before a run, a plain-language analysis with cited reference points and improvement suggestions after it, and,
-if you want it, guidance from start to end. None of them is built yet. Until they are, do the same steps by hand:
+Claude Code skills in `.claude/skills/` do this with you; each stops where the owner has to say yes:
 
-1. Record what the feature really sends: drive the real app (or the matching automated test) with HAR recording, then
-   `npm run perf -- har-summary <har> --api <api url> --out projects/<p>/features/<f>/recordings/<name>.json`, and delete the raw HAR.
+| Skill | What it does | Where it stops for the owner |
+| --- | --- | --- |
+| **perf-consult** | the front door: sizing before a run (business numbers to users, think time and req/s, the arithmetic shown) and a plain-language analysis after it, with cited reference points and ranked suggestions | sizing proposals change `workload.yaml` only after a yes |
+| **perf-discover** | finds the feature's real requests from what you hand it (a spec, the swagger, a link to record, a HAR, a curl, another repo's test) and writes `journey.yaml`, `workload.yaml` and `context.md`; proposes a new project from the template | Gate A: a new project's or env's settings; Gate B: the journey review |
+| **perf-script** | writes the k6 script and runs it until its smoke is green, without weakening a check | a red smoke caused by the app or env is reported, not worked around |
+| **perf-run** | the dry run, the run, and what a refusal or an unhealthy run means | every load, stress or soak run waits for the owner's go after the dry run |
+| **perf-report** | `findings.md` for a run folder, every number cited and checked with `--verify-findings` | accepting a baseline is the owner's call |
+
+Just say what you want ("load test the item search"); perf-consult answers and offers **guided mode**, which goes
+discover → script and smoke → sizing → dry run and go → run → findings → analysis, stopping at every gate above with a
+status line after each stage ("done: journey reviewed; next: script and smoke"). It never starts a load without your go.
+
+The same steps by hand, for when the skills are not available (or to see what they do):
+
+1. Record what the feature really sends: `npm run perf -- record <p> --env <env> --start <app url> --out projects/<p>/features/<f>/recordings/<name>.json`
+   opens a browser, you drive the app and close it, and only the scrubbed recording (and `<name>.auth.json`, the shape of the
+   login) is kept. Or drive the matching automated test with HAR recording, then
+   `npm run perf -- har-summary <har> --api <api url> --out …` and delete the raw HAR.
 2. Write `journey.yaml` (the steps, each with its evidence) and `workload.yaml` (user mix, think time, profile sizes) in
-   `projects/<p>/features/<f>/`. Copy the self-test project's (`runner/selftest/project/features/items/`).
-3. Write `<f>.js` the way `items.js` is written: `step()` for every request, a content check in each.
+   `projects/<p>/features/<f>/`. Copy the template's example first (`projects/_template/features/example/`, every key
+   commented); the self-test project's (`runner/selftest/project/features/items/`) is a filled-in second reference.
+3. Write `<f>.js` the way `example.js` (or the self-test's `items.js`) is written: `step()` for every request, a content check in each.
 4. `npm run perf -- check <p> <f> --env <env>` until it says `0 problems`, then a smoke run until it is green.
 5. A load run inside the window, read the report, `baseline accept` if it is a good one.
 
@@ -508,7 +544,9 @@ Grafana's public QuickPizza demo app at https://quickpizza.grafana.com with no s
 a static header with a random token per virtual user, caps of 5 users, 5 requests per second and 5 minutes, smoke and load
 only, and one write that the app prunes itself. Its own `README.md` says how to run it, what its report shows and does not
 show, and how it maps to `projects/_template/`. It is a shared public site, so run it with small loads only and keep to
-section 1.
+section 1. To try the skills on it, ask for a test of one of its features; the caps in its `project.yaml` (the public
+demo row of perf-consult's sizing table) still bound every proposal. The self-test project on the local mock is the
+place to walk guided mode end to end without touching anyone's env.
 
 ## 12. Further reading
 

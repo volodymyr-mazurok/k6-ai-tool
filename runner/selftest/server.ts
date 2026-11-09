@@ -45,6 +45,8 @@ const SEARCH_BODY = JSON.stringify({
   totalCount: 500,
 });
 
+const COUNT_BODY = JSON.stringify({ totalCount: 500, pageSize: 20, name: 'Items' });
+
 const EXPORT_BODY = Buffer.alloc(EXPORT_BYTES, 'perf-export;');
 
 // Keys carry the /api prefix, like the real API's swagger.
@@ -52,6 +54,7 @@ const SWAGGER = JSON.stringify({
   openapi: '3.0.1',
   info: { title: 'Perf mock API', version: 'v1' },
   paths: {
+    '/api/items/count': { get: { operationId: 'ItemsCount', responses: { '200': { description: 'OK' } } } },
     '/api/items/search': { post: { operationId: 'ItemsSearch', responses: { '200': { description: 'OK' } } } },
     '/api/items/slow-search': { post: { operationId: 'ItemsSlowSearch', responses: { '200': { description: 'OK' } } } },
     '/api/items/export': { post: { operationId: 'ItemsExport', responses: { '200': { description: 'OK' } } } },
@@ -61,6 +64,57 @@ const SWAGGER = JSON.stringify({
 const ROOT_HTML =
   '<!doctype html><html><head><title>Perf mock app</title></head>' +
   '<body><app-root></app-root><script src="main-SELFTEST.js"></script></body></html>';
+
+// A tiny page for the browser tests (perf record): it signs in with the mock's own login, searches on load and again when
+// the button is pressed, with what was typed in the box. `/app?away=<url>` adds a link to <url> (a test of leaving the origin).
+// /login and /plain-login are pages with password-like fields, for the tests that must refuse to fill them.
+const APP_HTML = `<!doctype html><html><head><title>Perf mock page</title></head><body>
+<input id="q" type="text" placeholder="search"><button id="go" type="button">Search</button><span id="out"></span><a id="blank" target="_blank" href="/app">new tab</a>
+<script>
+let token;
+async function signIn() {
+  if (!token) {
+    const res = await fetch('/oauth/token', {
+      method: 'POST',
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      body: 'grant_type=password&username=${LOGIN}&password=${PASSWORD}',
+    });
+    token = (await res.json()).access_token;
+  }
+  return token;
+}
+async function search(query) {
+  const res = await fetch('/api/items/search', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', authorization: 'Bearer ' + (await signIn()) },
+    body: JSON.stringify({ query, currentPage: 1, currentSize: 20 }),
+  });
+  document.getElementById('out').textContent = 'status ' + res.status;
+}
+const away = new URLSearchParams(location.search).get('away');
+if (away) {
+  const link = document.createElement('a');
+  link.id = 'away';
+  link.href = away;
+  link.textContent = 'elsewhere';
+  document.body.append(link);
+}
+document.getElementById('go').addEventListener('click', () => search(document.getElementById('q').value));
+search('');
+</script></body></html>`;
+
+const LOGIN_HTML =
+  '<!doctype html><html><head><title>Perf mock login</title></head><body>' +
+  '<input id="user" type="text" name="username"><input id="pw" type="password"></body></html>';
+
+// Password-like fields that are NOT type=password: found by their name, placeholder, label or aria-label.
+const PLAIN_LOGIN_HTML =
+  '<!doctype html><html><head><title>Perf mock plain login</title></head><body>' +
+  '<input id="secret" type="text" name="password">' +
+  '<input id="ph" type="text" name="a" placeholder="Password">' +
+  '<label for="lbl">Your passcode</label><input id="lbl" type="text">' +
+  '<input id="aria" type="text" aria-label="PIN / pwd">' +
+  '<input id="ok" type="text" name="city" placeholder="City"></body></html>';
 
 /** A semaphore with a bounded wait queue: acquire() resolves false when the queue is already full. */
 class SlotQueue {
@@ -147,6 +201,9 @@ export async function startMockServer(opts: MockServerOptions = {}): Promise<Moc
   }
 
   const apiRoutes: Record<string, (res: ServerResponse) => Promise<void>> = {
+    'GET /api/items/count': async (res) => {
+      sendJson(res, 200, COUNT_BODY);
+    },
     'POST /api/items/search': async (res) => {
       await sleep(SEARCH_LATENCY_MS);
       sendJson(res, 200, SEARCH_BODY);
@@ -173,6 +230,14 @@ export async function startMockServer(opts: MockServerOptions = {}): Promise<Moc
     if (route === 'POST /oauth/token') return tokenEndpoint(req, res);
     if (route === 'GET /swagger/v1/swagger.json') return sendJson(res, 200, SWAGGER);
     if (route === 'GET /') return send(res, 200, 'text/html; charset=utf-8', ROOT_HTML);
+    if (route === 'GET /app') return send(res, 200, 'text/html; charset=utf-8', APP_HTML);
+    if (route === 'GET /login') return send(res, 200, 'text/html; charset=utf-8', LOGIN_HTML);
+    if (route === 'GET /plain-login') return send(res, 200, 'text/html; charset=utf-8', PLAIN_LOGIN_HTML);
+    if (route === 'GET /redirect') {
+      const to = new URL(req.url ?? '/', 'http://mock').searchParams.get('to') ?? '/';
+      res.writeHead(302, { location: to });
+      return void res.end();
+    }
 
     if (!hasBearerToken(req)) return sendJson(res, 401, { error: 'unauthorized' });
     const apiRoute = apiRoutes[route];

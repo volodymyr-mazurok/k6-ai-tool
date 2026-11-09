@@ -183,15 +183,27 @@ test('setFailRate(1) makes API calls return 500 planted', async () => {
   });
 });
 
-test('swagger lists the three item routes', async () => {
+test('swagger lists the four item routes: a GET count and three POSTs', async () => {
   await withServer({}, async (server) => {
     const res = await fetch(`${server.url}/swagger/v1/swagger.json`);
     assert.equal(res.status, 200);
     const doc = (await res.json()) as { paths: Record<string, Record<string, unknown>> };
-    assert.deepEqual(Object.keys(doc.paths).sort(), ['/api/items/export', '/api/items/search', '/api/items/slow-search']);
-    for (const operations of Object.values(doc.paths)) {
-      assert.ok(operations.post, 'each route has a post operation');
+    assert.deepEqual(Object.keys(doc.paths).sort(), ['/api/items/count', '/api/items/export', '/api/items/search', '/api/items/slow-search']);
+    assert.ok(doc.paths['/api/items/count']!.get, 'count is a GET');
+    for (const [path, operations] of Object.entries(doc.paths)) {
+      if (path !== '/api/items/count') assert.ok(operations.post, `${path} has a post operation`);
     }
+  });
+});
+
+test('/app is a small page that signs in and searches, for the browser tests', async () => {
+  await withServer({}, async (server) => {
+    const res = await fetch(`${server.url}/app`);
+    assert.equal(res.status, 200);
+    assert.match(res.headers.get('content-type') ?? '', /text\/html/);
+    const html = await res.text();
+    assert.match(html, /\/api\/items\/search/);
+    assert.match(html, /id="go"/);
   });
 });
 
