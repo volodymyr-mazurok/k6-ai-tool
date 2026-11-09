@@ -38,7 +38,7 @@ How to read each number `report.html` and `report.md` show. Where a source suppo
 
 ## Open and closed load
 
-- With virtual users that wait for each answer (closed model), a slow system receives less load, and the slowest moments are under-sampled [ref:k6-open-closed-models]. This is coordinated omission: tail percentiles then look better than real users would see [ref:coordinated-omission-scylladb].
+- With virtual users that wait for each answer (closed model), a slow system receives less load [ref:k6-open-closed-models], and the slowest moments are under-sampled [ref:coordinated-omission-scylladb]. This is coordinated omission: tail percentiles then look better than real users would see [ref:coordinated-omission-scylladb].
 - With a fixed arrival rate (open model) the load does not ease off [ref:k6-open-closed-models]. When a report compares runs, check that both used the same model and rate.
 - `vus` shows whether the ramp did what was planned.
 
@@ -57,5 +57,5 @@ DB CPU and DB IO are the two figures the report quotes from the database.
 
 ## Targets and scores
 
-- A latency objective is "share of requests under a limit" [ref:sre-workbook-slos]. Round limits down to manageable numbers (the workbook's example is steps of 50 ms) instead of copying today's measurement, and do not set a target from one run.
+- A latency objective is "share of requests under a limit" [ref:sre-workbook-slos]. Round limits down to manageable numbers instead of copying today's measurement, and do not set a target from one run.
 - An Apdex-style score collapses times into 0-1 against a target T [ref:apdex]. The report does not print one; if you compute one, state T, because the score moves with it.

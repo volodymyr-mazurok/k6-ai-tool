@@ -56,7 +56,7 @@ Files: `summary.json` (k6's totals per metric, per step by the `name` tag), `tim
 
 ## Numbers that flatter the system
 
-- **Shows as:** a closed-model run (fixed users) whose throughput falls as latency rises, with a clean-looking p99. The slowest periods are under-sampled [ref:k6-open-closed-models] and tail percentiles look better than users would see [ref:coordinated-omission-scylladb].
+- **Shows as:** a closed-model run (fixed users) whose throughput falls as latency rises, with a clean-looking p99. Throughput falls because a slow system receives less load [ref:k6-open-closed-models]; the slowest periods are under-sampled and tail percentiles look better than users would see [ref:coordinated-omission-scylladb].
 - **Usual fixes:** use a fixed arrival rate when the question is about a rate, and compare p99 only between runs that used the same model [ref:k6-open-closed-models].
 
 ## The load machine is the bottleneck
